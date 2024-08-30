@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+from rich import print as rprint
+from rich.markup import escape
+from rich.text import Text
 
 from utils import VALID_CONGRESSIONAL_DISTRICTS, VALID_US_STATES, ELECTORAL_VOTES_2010, EV_TO_WIN, TOTAL_EV
 
@@ -36,19 +39,71 @@ def calculate_forecast_metrics(pred_dem, pred_rep, actual_results, locations):# 
     }
     return raw_forecast_data
 
+def prob_color(prob):
+    if prob > 50:
+        r = int(255 * (100 - prob) / 50)
+        g = int(255 * (100 - prob) / 50)
+        b = 255
+    else:
+        r = 255
+        g = int(255 * prob / 50)
+        b = int(255 * prob / 50)
+    return f"rgb({r},{g},{b})"
+
+def stylize_forecast_row(state, row):
+    state_text = Text(f"{state:<6}")
+    state_text.stylize("bold green" if row['call_correct'] else "bold red")
+
+    d_win_prob_text = Text(f"{row['d_win_prob']:9.1f}%")
+    r_win_prob_text = Text(f"{row['r_win_prob']:9.1f}%")
+    
+    prob_style = prob_color(row['d_win_prob'])
+    d_win_prob_text.stylize(prob_style)
+    r_win_prob_text.stylize(prob_style)
+
+    d_pred_mean_text = Text(f" {row['d_pred_mean']:6.1f}%")
+    d_pred_se_text = Text(f"({row['d_pred_se']:4.1f}%)")
+    prob_style = prob_color(row['d_pred_mean'])
+    
+    r_pred_mean_text = Text(f" {row['r_pred_mean']:6.1f}%")
+    r_pred_se_text = Text(f"({row['r_pred_se']:4.1f}%)")
+    
+    d_pred_mean_text.stylize(prob_style)
+    d_pred_se_text.stylize(prob_style)
+    r_pred_mean_text.stylize(prob_style)
+    r_pred_se_text.stylize(prob_style)
+
+    formatted_row = (
+        d_pred_mean_text + " " + d_pred_se_text + " " + r_pred_mean_text + " " + r_pred_se_text + " "
+        f"{row['margin']:+6.1f}% ({row['margin_se']:4.1f}%) "
+    )
+
+
+    d_actual_text = Text(f" {row['d_actual']:7.1f}%")
+    r_actual_text = Text(f"{row['r_actual']:7.1f}%")
+    prob_style = prob_color(row['d_actual'])
+    d_actual_text.stylize(prob_style)
+    r_actual_text.stylize(prob_style)
+
+    actual_results = (
+        d_actual_text + f" {row['d_error']:+7.1f}% " +
+        r_actual_text + f" {row['r_error']:+7.1f}%"
+    )
+
+    return state_text + formatted_row + d_win_prob_text + " " + r_win_prob_text + actual_results
+
 def print_forecast_table(raw_forecast_df):
     print(f"\n{'State':<6} {'D Pred (SE)':>15} {'R Pred (SE)':>15} {'Margin (SE)':>15} {'D Win Prob':>10} {'R Win Prob':>10} {'D Actual':>8} {'D Error':>8} {'R Actual':>8} {'R Error':>8}")
     print("-" * 110)
     for state, row in raw_forecast_df.iterrows():
         if state == "US": 
             continue
-        print(f"{state:<6} {row['d_pred_mean']:6.1f}% ({row['d_pred_se']:4.1f}%) {row['r_pred_mean']:6.1f}% ({row['r_pred_se']:4.1f}%) {row['margin']:+6.1f}% ({row['margin_se']:4.1f}%) {row['d_win_prob']:9.1f}% {row['r_win_prob']:9.1f}% {row['d_actual']:7.1f}% {row['d_error']:+7.1f}% {row['r_actual']:7.1f}% {row['r_error']:+7.1f}%")
+        rprint(stylize_forecast_row(state, row))
     print("-" * 110)
 
     print()
     print(f"NATIONAL POPULAR VOTE (predicted):")
-    us_row = raw_forecast_df.loc["US"]
-    print(f"{'US':<6} {us_row['d_pred_mean']:6.1f}%  {us_row['r_pred_mean']:6.1f}% ({us_row['r_pred_se']:4.1f}%) {us_row['margin']:+6.1f}% ({us_row['margin_se']:4.1f}%) {us_row['d_win_prob']:9.1f}% {us_row['r_win_prob']:9.1f}% {us_row['d_actual']:7.1f}% {us_row['d_error']:+7.1f}% {us_row['r_actual']:7.1f}% {us_row['r_error']:+7.1f}%")
+    rprint(stylize_forecast_row("US", raw_forecast_df.loc["US"]))
     print()
 
 def calculate_ev_forecast(dem_no_us, rep_no_us, raw_forecast_df, actual_results):

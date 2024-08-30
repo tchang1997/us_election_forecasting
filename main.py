@@ -2,6 +2,7 @@ import argparse
 import os
 
 import arviz as az
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymc as pm
@@ -75,6 +76,7 @@ def generate_state_forecast_figure(state, figure_path, trace, polling_data, fore
     )
     forecast_fig, lgd = plot_forecast(*data)
     forecast_fig.savefig(figure_path, bbox_inches="tight", bbox_extra_artists=(lgd,))
+    plt.close(forecast_fig)  # Close the figure after saving
 
 
 if __name__ == '__main__':

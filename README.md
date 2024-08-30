@@ -4,6 +4,10 @@ This is a hobby project for electoral forecasting, using [publicly-available pol
 
 **Objective:** predict national and state-by-state vote margins for the 2024 U.S. Presidential Election by aggregating polling data, outputting an electoral college and popular vote forecast.
 
+![National Forecast](results/polls_only/US_2016_forecast.pdf)
+
+This chart shows the predicted vote share over time for the Democratic and Republican candidates, along with 95% confidence intervals. The vertical dotted line indicates the forecast horizon (1 week before the election in this case). Actual polls are shown as scattered points, while the final election result is indicated by the horizontal dotted lines.
+
 ## How to run stuff
 
 To replicate our results (a forecast of the 2016 election), run
@@ -18,9 +22,19 @@ The dataset contains 3,004 general election polls (among polls for other races) 
 
 ## Model specification
 
-Our model is largely based on Drew Linzer's Votamatic model, described in ["Dynamic Bayesian Forecasting of Presidential Elections in the States" (2013)](https://votamatic.org/wp-content/uploads/2013/07/Linzer-JASA13.pdf), with a few modifications. Essentially, this model places a multivariate Gaussian random walk prior on the voting averages of all states, moving *backward* in time from an initial distribution centered on an initial forecast based on election results from previous cycles. We assume state and national level effects ONLY (this is a very simple model).
+Our model is largely based on Drew Linzer's Votamatic model, described in ["Dynamic Bayesian Forecasting of Presidential Elections in the States" (2013)](https://votamatic.org/wp-content/uploads/2013/07/Linzer-JASA13.pdf), with a few "because I can" style modifications. Essentially, this model places a multivariate Gaussian random walk prior on a "state-level" and "national-level" effect variable. Notably, we don't constrain the covariance to be diagonal, which naturally allows for modeling correlations between states (but runs some risks -- that's a lot of parameters). We then combine the state and national-level effects to output probabilistic forecasts of state and national voting averages at each timepoint.
 
 ## Forecast results
 
-To be added as runs finish!
+More to be added as runs finish!
+
+### 2016 Election 
+
+|Model|(D) Win Prob.|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|
+|----|----|----|----|----|----|----|
+|Polls-only, one week out|73.5%|290.9 (± 0.3)|232|247.1 (± 0.3)|306|46|
+
+**Disclaimer:** Note that I really didn't spend much time tuning this/doing so in any systematic manner.
+
+States that were incorrect in our simplest polls-only model were FL, IA, ME-2, MI, PA, and WI. In particular, we basically re-created the big misses in MI, PA, and WI in the 2016 election in many polls-based forecasts. In addition, one week before the election, the [538 forecast](https://projects.fivethirtyeight.com/2016-election-forecast/) projected a (D) win probability of 75.2%. Ours is 73.5%, which is subjectively pretty close.
 

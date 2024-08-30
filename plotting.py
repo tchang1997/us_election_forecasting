@@ -35,11 +35,10 @@ def plot_forecast(
 
     #first_row = orig_data.iloc[0]
 
-    final_margin = dem_pi_sample[..., -1].mean() - dem_pi_sample[..., -1].mean()
+    final_margin = dem_pi_sample[..., -1].mean() - rep_pi_sample[..., -1].mean()
     win_prob = (dem_pi_sample[..., -1] > rep_pi_sample[..., -1]).mean()
 
     ax.set_title(header["cand1_name"] + " (D) vs. " + header["cand2_name"] + " (R), State: " + header["location"] + " (" + header["type_simple"] + f")\nFinal margin: D{100 * final_margin:+.1f} - Dem. Win: {win_prob * 100:.2f}%")
-    ax.set_ylim((30, 70))
     ax.yaxis.set_major_formatter(mtick.PercentFormatter())
 
     total_weeks = np.arange(len(dem_mean))
@@ -74,6 +73,6 @@ def plot_forecast(
         # then, we expect an iterable of the Dem vote share and the Rep vote share
         ax.hlines(election_result[["cand1_actual", "cand2_actual"]], xmin=0, xmax=len(dem_mean), linestyles="dotted", colors=["blue", "red"])
 
-    lgd = fig.legend(loc="lower center", ncols=3, title="Legend", bbox_to_anchor=(0.5, -0.25))
+    lgd = fig.legend(loc="lower center", ncols=3, title="Legend", bbox_to_anchor=(0.5, -0.1))
     fig.tight_layout()
     return fig, lgd
