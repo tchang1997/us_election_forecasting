@@ -4,7 +4,7 @@ This is a hobby project for electoral forecasting, using [publicly-available pol
 
 **Objective:** predict national and state-by-state vote margins for the 2024 U.S. Presidential Election by aggregating polling data, outputting an electoral college and popular vote forecast.
 
-![National Forecast](results/polls_only/US_2016_forecast.pdf)
+![National Forecast](https://github.com/tchang1997/us_election_forecasting/blob/main/US_2016_forecast.pdf)
 
 This chart shows the predicted vote share over time for the Democratic and Republican candidates, along with 95% confidence intervals. The vertical dotted line indicates the forecast horizon (1 week before the election in this case). Actual polls are shown as scattered points, while the final election result is indicated by the horizontal dotted lines.
 
