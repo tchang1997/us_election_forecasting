@@ -1,8 +1,25 @@
-train_years:
-  - 2000
-  - 2008
-  - 2012
-  - 2016
-val_years:
-  - 2004
-  - 2020
+column_mappings: # mappings from keywords used in our models to data columns
+  "small":
+    dem_pct: "cand1_pct"
+    rep_pct: "cand2_pct"
+    dem_actual: "cand1_actual"
+    rep_actual: "cand2_actual"
+    dem_name: "cand1_name"
+    rep_name: "cand2_name"
+    election_date: "electiondate"
+    poll_date: "polldate"
+    year: "year"
+    location: "location"
+    sample_size: "samplesize"
+  "full":
+    dem_pct: "pct_DEM"
+    rep_pct: "pct_REP"
+    dem_actual: "DEM_actual"
+    rep_actual: "REP_actual"
+    dem_name: "DEM_candidate_name"
+    rep_name: "REP_candidate_name"
+    election_date: "election_date"
+    poll_date: "end_date"
+    year: "cycle"
+    location: "state_cd" 
+    sample_size: "sample_size"

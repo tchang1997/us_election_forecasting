@@ -6,17 +6,17 @@ from rich.text import Text
 
 from utils import VALID_CONGRESSIONAL_DISTRICTS, VALID_US_STATES, ELECTORAL_VOTES_2010, EV_TO_WIN, TOTAL_EV
 
-def calculate_forecast_metrics(pred_dem, pred_rep, actual_results, locations):# Calculate mean and standard error for each location
+def calculate_forecast_metrics(colmap, pred_dem, pred_rep, actual_results, locations):# Calculate mean and standard error for each location
     pred_dem_mean = pred_dem.mean(axis=(0, 1))
     pred_dem_se = pred_dem.std(axis=(0, 1)) / (pred_dem.shape[0] * pred_dem.shape[1])**0.5
     pred_rep_mean = pred_rep.mean(axis=(0, 1))
     pred_rep_se = pred_rep.std(axis=(0, 1)) / (pred_rep.shape[0] * pred_rep.shape[1])**0.5
     dem_win_prob = (pred_dem > pred_rep).mean(axis=(0, 1)) 
     # Compute signed error for each location
-    dem_signed_error = actual_results['cand1_actual'] - pred_dem_mean * 100
-    rep_signed_error = actual_results['cand2_actual'] - pred_rep_mean * 100
+    dem_signed_error = actual_results[colmap["dem_actual"]] - pred_dem_mean * 100
+    rep_signed_error = actual_results[colmap["rep_actual"]] - pred_rep_mean * 100
 
-    dem_winners = (actual_results['cand1_actual'] > actual_results['cand2_actual'])
+    dem_winners = (actual_results[colmap["dem_actual"]] > actual_results[colmap["rep_actual"]])
     forecast_dem_winners = pd.Series((pred_dem_mean > pred_rep_mean), index=dem_winners.index)
 
     raw_forecast_data = {
@@ -29,9 +29,9 @@ def calculate_forecast_metrics(pred_dem, pred_rep, actual_results, locations):# 
         'margin_se': np.sqrt(pred_dem_se**2 + pred_rep_se**2) * 100,
         'd_win_prob': dem_win_prob * 100,
         'r_win_prob': (1 - dem_win_prob) * 100,
-        'd_actual': actual_results['cand1_actual'].values,
+        'd_actual': actual_results[colmap["dem_actual"]].values,
         'd_error': dem_signed_error.values,
-        'r_actual': actual_results['cand2_actual'].values,
+        'r_actual': actual_results[colmap["rep_actual"]].values,
         'r_error': rep_signed_error.values,
         'winner_pred': np.where(forecast_dem_winners, "D", "R"),
         'winner_actual': np.where(dem_winners, "D", "R"),
@@ -49,6 +49,32 @@ def prob_color(prob):
         g = int(255 * prob / 50)
         b = int(255 * prob / 50)
     return f"rgb({r},{g},{b})"
+
+def get_rating(prob):
+    if prob >= 95:
+        return "Safe D"
+    elif prob >= 80:
+        return "Likely D"
+    elif prob >= 65:
+        return "Lean D"
+    elif prob > 35:
+        return "Toss-Up"
+    elif prob > 20:
+        return "Lean R"
+    elif prob > 5:
+        return "Likely R"
+    else:
+        return "Safe R"
+    
+def error_color(error):
+    if error > 10:
+        return "bold red"
+    elif error > 6:
+        return "red"
+    elif error > 3:
+        return "yellow"
+    else:
+        return "green"
 
 def stylize_forecast_row(state, row):
     state_text = Text(f"{state:<6}")
@@ -74,32 +100,39 @@ def stylize_forecast_row(state, row):
     r_pred_se_text.stylize(prob_style)
 
     formatted_row = (
-        d_pred_mean_text + " " + d_pred_se_text + " " + r_pred_mean_text + " " + r_pred_se_text + " "
+        d_pred_mean_text + " " + d_pred_se_text + " " + r_pred_mean_text + " " + r_pred_se_text + " " +
         f"{row['margin']:+6.1f}% ({row['margin_se']:4.1f}%) "
     )
 
 
-    d_actual_text = Text(f" {row['d_actual']:7.1f}%")
+    rating = get_rating(row['d_win_prob'])
+    rating_text = Text(f"{rating:>10}")
+    rating_style = prob_color(row['d_win_prob'])
+    rating_text.stylize(rating_style)
+
+    d_actual_text = Text(f"{row['d_actual']:7.1f}%")
     r_actual_text = Text(f"{row['r_actual']:7.1f}%")
     prob_style = prob_color(row['d_actual'])
     d_actual_text.stylize(prob_style)
     r_actual_text.stylize(prob_style)
 
-    actual_results = (
-        d_actual_text + f" {row['d_error']:+7.1f}% " +
-        r_actual_text + f" {row['r_error']:+7.1f}%"
-    )
+    d_error_text = Text(f"{row['d_error']:+7.1f}%")
+    d_error_text.stylize(error_color(abs(row['d_error'])))
+    r_error_text = Text(f"{row['r_error']:+7.1f}%")
+    r_error_text.stylize(error_color(abs(row['r_error'])))
 
-    return state_text + formatted_row + d_win_prob_text + " " + r_win_prob_text + actual_results
+    actual_results = d_actual_text + " " + d_error_text + " " + r_actual_text + " " + r_error_text
+
+    return state_text + formatted_row + d_win_prob_text + " " + r_win_prob_text + " " + rating_text + " " + actual_results
 
 def print_forecast_table(raw_forecast_df):
-    print(f"\n{'State':<6} {'D Pred (SE)':>15} {'R Pred (SE)':>15} {'Margin (SE)':>15} {'D Win Prob':>10} {'R Win Prob':>10} {'D Actual':>8} {'D Error':>8} {'R Actual':>8} {'R Error':>8}")
-    print("-" * 110)
+    print(f"\n{'State':<6} {'D Pred (SE)':>15} {'R Pred (SE)':>15} {'Margin (SE)':>15} {'D Win Prob':>11} {'R Win Prob':>11} {'Rating':>10} {'D Actual':>8} {'D Error':>8} {'R Actual':>8} {'R Error':>8}")
+    print("-" * 130)
     for state, row in raw_forecast_df.iterrows():
         if state == "US": 
             continue
         rprint(stylize_forecast_row(state, row))
-    print("-" * 110)
+    print("-" * 130)
 
     print()
     print(f"NATIONAL POPULAR VOTE (predicted):")

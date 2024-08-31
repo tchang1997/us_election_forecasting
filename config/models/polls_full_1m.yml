@@ -1,0 +1,19 @@
+name: "polls_only_30d"
+model_name: "PollOnlyModel"
+year: 2020
+pymc:
+  n_samples: 2500
+  n_chains: 4
+  n_cores: 4
+  n_tune_steps: 1000
+  target_accept: 0.99
+  max_treedepth: 13
+model_kwargs:
+  forecast_horizon: 30
+  prior_precision: 5
+  prior_type: "half_t"
+  state_variance_prior_bias: 1.0e-4
+  state_variance_prior_sigma: 0.3
+  national_variance_prior_bias: 1.0e-4
+  national_variance_prior_sigma: 0.1
+  national_final_variance: 1.0e-6

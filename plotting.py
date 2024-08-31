@@ -10,6 +10,7 @@ plt.rcParams["font.family"] = "serif"
 
 # demp_pi_sample = trace["posterior"]["dem_pi"]
 def plot_forecast(
+        colmap,
         dem_pi_sample,
         rep_pi_sample,
         forecast_horizon,
@@ -18,6 +19,7 @@ def plot_forecast(
         election_result: Optional[pd.DataFrame] = None,
         polling_data: Optional[pd.DataFrame] = None,
         ci: Optional[float] = 95.,
+        tick_every: Optional[int] = 3,
     ):
 
     dem_pi_sample = dem_pi_sample[:, :, ::-1, state_idx]
@@ -38,7 +40,7 @@ def plot_forecast(
     final_margin = dem_pi_sample[..., -1].mean() - rep_pi_sample[..., -1].mean()
     win_prob = (dem_pi_sample[..., -1] > rep_pi_sample[..., -1]).mean()
 
-    ax.set_title(header["cand1_name"] + " (D) vs. " + header["cand2_name"] + " (R), State: " + header["location"] + " (" + header["type_simple"] + f")\nFinal margin: D{100 * final_margin:+.1f} - Dem. Win: {win_prob * 100:.2f}%")
+    ax.set_title(header[colmap["dem_name"]] + " (D) vs. " + header[colmap["rep_name"]] + " (R), State: " + header[colmap["location"]] + f"\nFinal margin: D{100 * final_margin:+.1f} - Dem. Win: {win_prob * 100:.2f}%")
     ax.yaxis.set_major_formatter(mtick.PercentFormatter())
 
     total_weeks = np.arange(len(dem_mean))
@@ -56,22 +58,23 @@ def plot_forecast(
     ax.set_ylabel("Vote share (%)")
     ax.vlines(len(dem_mean) - forecast_horizon, linestyle="dotted", color="black", ymin=0., ymax=100., label="Validation horizon")
 
-    raw_dates = np.array([(header["electiondate"] - pd.Timedelta(days=i)) for i in range(len(dem_mean) + 1)])
+    raw_dates = np.array([(header[colmap["election_date"]] - pd.Timedelta(days=i)) for i in range(len(dem_mean))])
     dates_list = np.vectorize(lambda x: x.strftime('%m/%d/%Y'))(raw_dates)
     dates_list[0] += "\n(Election Day)"
 
-    ax.set_xticks(range(0, len(dates_list), 2))
-    ax.set_xticklabels(dates_list[::-2], rotation=45)
+    ax.set_xticks(range(0, len(dates_list), tick_every))
+    ax.set_xticklabels(dates_list[::tick_every][::-1], rotation=45)
+    ax.set_xlim((0, len(dem_mean) - 1))
 
     if polling_data is not None:
         # then we expect polls to be a dataframe with polldate, cand1_pct, cand2_pct
-        poll_x = (polling_data["polldate"].map(lambda x: x.toordinal()) - raw_dates.min().toordinal()) / (raw_dates.max().toordinal() - raw_dates.min().toordinal()) * len(raw_dates)
-        ax.scatter(poll_x, polling_data["cand1_pct"], color="blue", alpha=0.2)
-        ax.scatter(poll_x, polling_data["cand2_pct"], color="red", alpha=0.2)
+        poll_x = (polling_data[colmap["poll_date"]].map(lambda x: x.toordinal()) - raw_dates.min().toordinal()) / (raw_dates.max().toordinal() - raw_dates.min().toordinal()) * len(raw_dates)
+        ax.scatter(poll_x, polling_data[colmap["dem_pct"]], color="blue", alpha=0.2)
+        ax.scatter(poll_x, polling_data[colmap["rep_pct"]], color="red", alpha=0.2)
 
     if election_result is not None:
         # then, we expect an iterable of the Dem vote share and the Rep vote share
-        ax.hlines(election_result[["cand1_actual", "cand2_actual"]], xmin=0, xmax=len(dem_mean), linestyles="dotted", colors=["blue", "red"])
+        ax.hlines(election_result[[colmap["dem_actual"], colmap["rep_actual"]]], xmin=0, xmax=len(dem_mean), linestyles="dotted", colors=["blue", "red"])
 
     lgd = fig.legend(loc="lower center", ncols=3, title="Legend", bbox_to_anchor=(0.5, -0.1))
     fig.tight_layout()

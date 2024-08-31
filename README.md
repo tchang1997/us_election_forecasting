@@ -1,12 +1,26 @@
 # U.S. Election Forecasting
 
-This is a hobby project for electoral forecasting, using [publicly-available polling data](https://www.natesilver.net/p/pollster-ratings-silver-bulletin) made available via the [Silver Bulletin](https://www.natesilver.net/) blog. Don't take it too seriously, I have very little idea what I'm doing. 
+This is a hobby project for electoral forecasting! Don't take it too seriously, I have very little idea what I'm doing. 
 
 **Objective:** predict national and state-by-state vote margins for the 2024 U.S. Presidential Election by aggregating polling data, outputting an electoral college and popular vote forecast.
 
-![National Forecast](https://github.com/tchang1997/us_election_forecasting/blob/main/US_2016_forecast.pdf)
+### Development roadmap
 
-This chart shows the predicted vote share over time for the Democratic and Republican candidates, along with 95% confidence intervals. The vertical dotted line indicates the forecast horizon (1 week before the election in this case). Actual polls are shown as scattered points, while the final election result is indicated by the horizontal dotted lines.
+**Higher priority**
+* Add full forecasts for ~2020~ and 2016 (monthly up to 6 months out, then weekly for final month)
+* Pollster-specific effects 
+* Add "polls-plus" capability (*e.g.*, "fundamentals" like incumbency effects, economic indices, demographics via linkage to census data)
+* Different initial variances by state (*e.g.*, prior_precision as a vector)
+* Different variance priors (*e.g.*, half-Cauchy?)
+
+**Moderate priority**
+* Add tipping point states to the report
+* Add ability to weight polls/pollsters differently (esp. LV vs. RV samples)
+
+**Low priority**
+* Convention bounce adjustment
+* A dashboard for exploring different forecasts
+* Third-party adjustment (for switching to polls that have third parties)
 
 ## How to run stuff
 
@@ -18,13 +32,44 @@ where you can replace `--config` with a configuration file of your choice. See `
 
 ## Dataset
 
-The dataset contains 3,004 general election polls (among polls for other races) from the 2000-2020 election cycles, inclusive. More polling datasets will be added in the future.
+For initial testing, we use the Silver Bulletin dataset.The dataset contains 3,004 general election polls (among polls for other races) from the 2000-2020 election cycles, inclusive. For other elections, we use the following:
+
+* **2024**: [FiveThirtyEight 2020 Election Forecast Polling Data, under "Presidential General Election" (current cycle)](https://projects.fivethirtyeight.com/polls/president-general/2024/national/)
+* **2020**: [FiveThirtyEight 2020 Election Forecast Polling Data, under "Presidential General Election" (past cycles)](https://projects.fivethirtyeight.com/polls/president-general/2024/national/)
+* **2016**: [FiveThirtyEight 2016 Election Forecast Polling Data](https://projects.fivethirtyeight.com/2016-election-forecast/)
+* **Small-scale model testing (2000-2020)**: [Silver Bulletin Pollster Data](https://www.natesilver.net/p/pollster-ratings-silver-bulletin)
 
 ## Model specification
 
 Our model is largely based on Drew Linzer's Votamatic model, described in ["Dynamic Bayesian Forecasting of Presidential Elections in the States" (2013)](https://votamatic.org/wp-content/uploads/2013/07/Linzer-JASA13.pdf), with a few "because I can" style modifications. Essentially, this model places a multivariate Gaussian random walk prior on a "state-level" and "national-level" effect variable. Notably, we don't constrain the covariance to be diagonal, which naturally allows for modeling correlations between states (but runs some risks -- that's a lot of parameters). We then combine the state and national-level effects to output probabilistic forecasts of state and national voting averages at each timepoint.
 
-## Forecast results
+## Forecast validation
+
+All models are fitted on polling data sourced via 538 archives. Model selection for 2024 is done based on results for the 2020 and 2016 elections based on the average number of correct states, which forgives larger polling errors in safe states, followed by the electoral vote forecast error. Metrics for each model are averaged over all forecasts for a single model.
+
+Once model selection is finished, I'll release some 2024 forecasts.
+
+### 2020 Election
+
+|Model|(D) Win Prob.|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|
+|----|----|----|----|----|----|----|
+|Polls-only, one month out|||||||
+
+### 2016 Election
+
+Coming soon!
+
+### 2012 Election and older
+
+If anyone knows a source for polling data in 2012 and earlier (the Silver Bulletin dataset seems to only include general election polls starting in October) -- please reach out!
+
+## Contact 
+
+Email: `ctrenton` at `umich` dot `edu`.
+
+## Old Forecast results
+
+Initial debugging was done on a smaller dataset of polls collected from October onward.
 
 More to be added as runs finish!
 

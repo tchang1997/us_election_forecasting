@@ -8,19 +8,24 @@ import pandas as pd
 import pymc as pm
 from ruamel.yaml import YAML
 
-from election_data import PollDataset
+from election_data import PollDataset, FlatPollDataset
 import models
 from plotting import plot_forecast
 from reporting import calculate_ev_forecast, calculate_forecast_metrics, print_forecast_table
 from utils import preprocess_for_plotting, VALID_LOCATIONS
 
-def evaluate_forecast(trace, df: pd.DataFrame, results_dir: str):
+def evaluate_forecast(
+        trace,
+        colmap,
+        df: pd.DataFrame,
+        results_dir: str,
+    ):
     locations = trace.posterior.coords["location"]
     pred_dem = trace.posterior.dem_pi[:, :, 0, :] # dims: chain, sample_size, time (reversed), location 
     pred_rep = trace.posterior.rep_pi[:, :, 0, :]
 
     actual_results = df.groupby("location")[["cand1_actual", "cand2_actual"]].first().sort_index()
-    raw_forecast_data = calculate_forecast_metrics(pred_dem, pred_rep, actual_results, locations)
+    raw_forecast_data = calculate_forecast_metrics(colmap, pred_dem, pred_rep, actual_results, locations)
     raw_forecast_df = pd.DataFrame(raw_forecast_data)
     raw_forecast_df.set_index('location', inplace=True) #
     print_forecast_table(raw_forecast_df)
@@ -38,15 +43,31 @@ def get_args():
     psr = argparse.ArgumentParser()
     psr.add_argument('--config', type=str, required=True, help='Path to the configuration file')
     psr.add_argument('--year', type=int, default=2016, help='Election year')
+    psr.add_argument('--dataset', type=str, default='small', choices=['small', 'full'], help='Dataset to use.')
     psr.add_argument('--overwrite', action='store_true', help='Overwrite existing results directory')
     psr.add_argument('--regenerate_figures', action='store_true', help='Regenerate existing figures')
     return psr.parse_args()
 
-def load_or_generate_trace(trace_filename, summary_path, overwrite, year, model_name, polling_data, pymc_config, model_kwargs):
+def load_dataset(dataset_name):
+    with open("./dataset_config.yml", 'r') as colmap_file:
+        colmaps = yaml.load(colmap_file)
+        colmap = colmaps["column_mappings"][dataset_name]
+    if dataset_name == "small":
+        polling_data = PollDataset() # automatically loads the Silver dataset. In the future allow configuration
+    elif dataset_name == "full":
+        polling_data = FlatPollDataset()
+    else:
+        raise ValueError(f"Invalid dataset: {dataset_name}")
+    return polling_data, colmap
+
+def load_or_generate_trace(colmap, trace_filename, summary_path, overwrite, year, model_name, polling_data, pymc_config, model_kwargs):
     ModelClass = getattr(models, model_name)
-    forecaster = ModelClass(year)
+    forecaster = ModelClass(year, colmap)
     if not os.path.exists(trace_filename) or overwrite:
-        _, trace, summary = forecaster.fit(polling_data, **pymc_config, **model_kwargs)
+        _, trace, summary = forecaster.fit(
+            polling_data,
+            **pymc_config, 
+            **model_kwargs)
         os.makedirs(os.path.dirname(trace_filename), exist_ok=True)
         print("Saving fit summary data to", summary_path)
         summary.to_csv(summary_path)
@@ -60,7 +81,7 @@ def load_or_generate_trace(trace_filename, summary_path, overwrite, year, model_
         summary = pd.read_csv(summary_path, index_col=0)
     return forecaster, trace, summary
 
-def generate_state_forecast_figure(state, figure_path, trace, polling_data, forecast_horizon, year, time_window, regenerate_figures, verbose=False):
+def generate_state_forecast_figure(colmap, state, figure_path, trace, polling_data, forecast_horizon, year, time_window, regenerate_figures, verbose=False):
     if os.path.exists(figure_path) and not regenerate_figures:
         if verbose:
             print(f"Figure for state {state} already exists at {figure_path}. Skipping...")
@@ -74,7 +95,7 @@ def generate_state_forecast_figure(state, figure_path, trace, polling_data, fore
         state,
         window_size=time_window
     )
-    forecast_fig, lgd = plot_forecast(*data)
+    forecast_fig, lgd = plot_forecast(colmap, *data)
     forecast_fig.savefig(figure_path, bbox_inches="tight", bbox_extra_artists=(lgd,))
     plt.close(forecast_fig)  # Close the figure after saving
 
@@ -86,34 +107,37 @@ if __name__ == '__main__':
     with open(args.config, 'r') as config_file:
         config = yaml.load(config_file)
 
+
     results_dir = os.path.join("./results", config["name"])
     trace_filename = os.path.join(results_dir, f"pymc_trace_{args.year}_horizon_{config['model_kwargs']['forecast_horizon']}d.nc")
-    figure_paths = [os.path.join(results_dir, f"{state}_{args.year}_forecast.pdf") for state in VALID_LOCATIONS]
+    figure_dir = os.path.join(results_dir, "figures")
+    figure_paths = [os.path.join(figure_dir, f"{state}_{args.year}_forecast.pdf") for state in VALID_LOCATIONS]
     summary_path = os.path.join(results_dir, "fit_summary.csv")
 
-    polling_data = PollDataset() # automatically loads the Silver dataset. In the future allow configuration
-
+    polling_data, colmap = load_dataset(args.dataset)
     forecaster, trace, summary = load_or_generate_trace(
+        colmap,
         trace_filename,
         summary_path,
         args.overwrite,
-        args.year,
+        config["year"],
         config["model_name"],
         polling_data,
         config["pymc"],
         config["model_kwargs"]
     )
-
+    os.makedirs(figure_dir, exist_ok=True)
     for state, figure_path in zip(VALID_LOCATIONS, figure_paths):
         generate_state_forecast_figure(
+            colmap,
             state,
             figure_path,
             trace,
             polling_data,
             config["model_kwargs"]["forecast_horizon"],
-            args.year,
+            config["year"],
             forecaster.time_window_days,
             args.regenerate_figures
         )
 
-    evaluate_forecast(trace, polling_data.filter_polls(year=args.year), results_dir)
+    evaluate_forecast(trace, colmap, polling_data.filter_polls(year=args.year), results_dir)
