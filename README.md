@@ -8,14 +8,14 @@ This is a hobby project for electoral forecasting! Don't take it too seriously, 
 
 **Higher priority**
 * Add full forecasts for ~2020~ and 2016 (monthly up to 6 months out, then weekly for final month)
-* Pollster-specific effects 
+* Pollster-specific effects (*e.g.*, house-effects, RV vs. LV)
 * Add "polls-plus" capability (*e.g.*, "fundamentals" like incumbency effects, economic indices, demographics via linkage to census data)
-* Different initial variances by state (*e.g.*, prior_precision as a vector)
-* Different variance priors (*e.g.*, half-Cauchy?)
 
 **Moderate priority**
 * Add tipping point states to the report
-* Add ability to weight polls/pollsters differently (esp. LV vs. RV samples)
+* Add ability to weight polls/pollsters differently by quality/time (note that this is distinct from a house-effect adjustment, which is tantamount to adjusting the polllster's "meann")
+* Different initial variances by state (*e.g.*, prior_precision as a vector)
+* ~Different variance priors (*e.g.*, half-Cauchy?)~
 
 **Low priority**
 * Convention bounce adjustment

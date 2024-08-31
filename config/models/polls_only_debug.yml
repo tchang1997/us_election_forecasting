@@ -1,5 +1,6 @@
 name: "polls_only_debug"
 model_name: "PollOnlyModel"
+year: 2016
 pymc:
   n_samples: 5
   n_chains: 2
