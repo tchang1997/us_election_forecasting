@@ -17,3 +17,6 @@ model_kwargs:
   national_variance_prior_bias: 1.0e-4
   national_variance_prior_sigma: 0.1
   national_final_variance: 1.0e-6
+forecast_kwargs:
+  max_backcast: 60
+  time_window_days: 1

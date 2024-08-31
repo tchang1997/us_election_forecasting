@@ -57,8 +57,11 @@ def plot_forecast(
     ax.set_xlabel("Date")
     ax.set_ylabel("Vote share (%)")
     ax.vlines(len(dem_mean) - forecast_horizon, linestyle="dotted", color="black", ymin=0., ymax=100., label="Validation horizon")
-
-    raw_dates = np.array([(header[colmap["election_date"]] - pd.Timedelta(days=i)) for i in range(len(dem_mean))])
+    
+    election_date = header[colmap["election_date"]]
+    if isinstance(election_date, str):
+        election_date = pd.to_datetime(election_date, format='%m/%d/%y')
+    raw_dates = np.array([(election_date - pd.Timedelta(days=i)) for i in range(len(dem_mean))])
     dates_list = np.vectorize(lambda x: x.strftime('%m/%d/%Y'))(raw_dates)
     dates_list[0] += "\n(Election Day)"
 
@@ -68,7 +71,13 @@ def plot_forecast(
 
     if polling_data is not None:
         # then we expect polls to be a dataframe with polldate, cand1_pct, cand2_pct
-        poll_x = (polling_data[colmap["poll_date"]].map(lambda x: x.toordinal()) - raw_dates.min().toordinal()) / (raw_dates.max().toordinal() - raw_dates.min().toordinal()) * len(raw_dates)
+        
+        # Convert poll_date to timestamp if it's not already
+        poll_dates = polling_data[colmap["poll_date"]]
+        if not pd.api.types.is_datetime64_any_dtype(polling_data[colmap["poll_date"]]):
+            poll_dates = pd.to_datetime(polling_data[colmap["poll_date"]], format='%m/%d/%y')
+        
+        poll_x = (poll_dates.map(lambda x: x.toordinal()) - raw_dates.min().toordinal()) / (raw_dates.max().toordinal() - raw_dates.min().toordinal()) * len(raw_dates)
         ax.scatter(poll_x, polling_data[colmap["dem_pct"]], color="blue", alpha=0.2)
         ax.scatter(poll_x, polling_data[colmap["rep_pct"]], color="red", alpha=0.2)
 

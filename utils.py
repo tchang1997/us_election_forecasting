@@ -68,19 +68,32 @@ def is_valid_state(state, allow_none=True):
 def is_valid_location(state, allow_none=True):
     return state in VALID_LOCATIONS or allow_none * (state is None)
 
-def preprocess_for_plotting(trace, polling_data, forecast_horizon, year, state, window_size=1):
+def preprocess_for_plotting(trace, polling_data, colmap, forecast_horizon, year, state, time_window_days=1, max_backcast=60):
     dem_pi = trace["posterior"]["dem_pi"]
     rep_pi = trace["posterior"]["rep_pi"]
     filtered_polling_data = polling_data.filter_polls(year=year, state=state)
     header = filtered_polling_data.iloc[0]
+    #election_result = polling_data.get_election_result(year=year, state=state)
     election_result = polling_data.get_election_result(year=year, state=state)
+
     state_idx = np.where(trace["posterior"]["location"] == state)[0].item()
                                                
-    tte = filtered_polling_data["electiondate"] - filtered_polling_data["polldate"]
+    # Convert to timestamps if not already
+    if not pd.api.types.is_datetime64_any_dtype(filtered_polling_data[colmap["election_date"]]):
+        election_date = pd.to_datetime(filtered_polling_data[colmap["election_date"]], format='%m/%d/%y', errors='coerce')
+    if not pd.api.types.is_datetime64_any_dtype(filtered_polling_data[colmap["poll_date"]]):
+        poll_dates = pd.to_datetime(filtered_polling_data[colmap["poll_date"]], format='%m/%d/%y', errors='coerce')
+    
+    tte = election_date - poll_dates
+    max_timedelta = min(tte.max(), pd.Timedelta(days=forecast_horizon + max_backcast))
+    bins = pd.timedelta_range(start='0D', end=max_timedelta + pd.Timedelta(days=time_window_days), freq=f'{time_window_days}D')
+    binned = pd.cut(tte, bins=bins, labels=np.arange(len(bins) - 1), include_lowest=True)
+    windows_to_election = binned.dropna().astype(int)
+    
     max_timedelta = tte.max()   
-    bins = pd.timedelta_range(start='0D', end=max_timedelta + pd.Timedelta(days=window_size), freq=f'{window_size}D') # don't repeat self...sigh TODO: make less hacky
-    windows_to_election = pd.cut(tte, bins=bins, labels=np.arange(len(bins) - 1)).astype(int)
+    bins = pd.timedelta_range(start='0D', end=max_timedelta + pd.Timedelta(days=time_window_days), freq=f'{time_window_days}D') # don't repeat self...sigh TODO: make less hacky
+    windows_to_election = pd.cut(tte, bins=bins, labels=np.arange(len(bins) - 1), include_lowest=True).astype(int)
 
-    state_mask = (windows_to_election >= forecast_horizon) & (filtered_polling_data["location"] == state)
+    state_mask = (windows_to_election >= forecast_horizon) & (filtered_polling_data[colmap["location"]] == state)
     polling_data_until_forecast = filtered_polling_data[state_mask]
     return dem_pi, rep_pi, forecast_horizon, header, state_idx, election_result, polling_data_until_forecast

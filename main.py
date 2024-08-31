@@ -1,4 +1,5 @@
 import argparse
+import operator as op
 import os
 
 import arviz as az
@@ -24,7 +25,7 @@ def evaluate_forecast(
     pred_dem = trace.posterior.dem_pi[:, :, 0, :] # dims: chain, sample_size, time (reversed), location 
     pred_rep = trace.posterior.rep_pi[:, :, 0, :]
 
-    actual_results = df.groupby("location")[["cand1_actual", "cand2_actual"]].first().sort_index()
+    actual_results = df.groupby(colmap["location"])[[colmap["dem_actual"], colmap["rep_actual"]]].first().sort_index()
     raw_forecast_data = calculate_forecast_metrics(colmap, pred_dem, pred_rep, actual_results, locations)
     raw_forecast_df = pd.DataFrame(raw_forecast_data)
     raw_forecast_df.set_index('location', inplace=True) #
@@ -42,7 +43,6 @@ def evaluate_forecast(
 def get_args():
     psr = argparse.ArgumentParser()
     psr.add_argument('--config', type=str, required=True, help='Path to the configuration file')
-    psr.add_argument('--year', type=int, default=2016, help='Election year')
     psr.add_argument('--dataset', type=str, default='small', choices=['small', 'full'], help='Dataset to use.')
     psr.add_argument('--overwrite', action='store_true', help='Overwrite existing results directory')
     psr.add_argument('--regenerate_figures', action='store_true', help='Regenerate existing figures')
@@ -60,9 +60,9 @@ def load_dataset(dataset_name):
         raise ValueError(f"Invalid dataset: {dataset_name}")
     return polling_data, colmap
 
-def load_or_generate_trace(colmap, trace_filename, summary_path, overwrite, year, model_name, polling_data, pymc_config, model_kwargs):
+def load_or_generate_trace(colmap, trace_filename, summary_path, overwrite, year, model_name, polling_data, forecast_kwargs, pymc_config, model_kwargs):
     ModelClass = getattr(models, model_name)
-    forecaster = ModelClass(year, colmap)
+    forecaster = ModelClass(year, colmap, **forecast_kwargs)
     if not os.path.exists(trace_filename) or overwrite:
         _, trace, summary = forecaster.fit(
             polling_data,
@@ -81,7 +81,7 @@ def load_or_generate_trace(colmap, trace_filename, summary_path, overwrite, year
         summary = pd.read_csv(summary_path, index_col=0)
     return forecaster, trace, summary
 
-def generate_state_forecast_figure(colmap, state, figure_path, trace, polling_data, forecast_horizon, year, time_window, regenerate_figures, verbose=False):
+def generate_state_forecast_figure(colmap, state, figure_path, trace, polling_data, forecast_kwargs, forecast_horizon, year, time_window, regenerate_figures, verbose=False):
     if os.path.exists(figure_path) and not regenerate_figures:
         if verbose:
             print(f"Figure for state {state} already exists at {figure_path}. Skipping...")
@@ -90,10 +90,11 @@ def generate_state_forecast_figure(colmap, state, figure_path, trace, polling_da
     data = preprocess_for_plotting(
         trace,
         polling_data,
+        colmap,
         forecast_horizon,
         year,
         state,
-        window_size=time_window
+        **forecast_kwargs,
     )
     forecast_fig, lgd = plot_forecast(colmap, *data)
     forecast_fig.savefig(figure_path, bbox_inches="tight", bbox_extra_artists=(lgd,))
@@ -109,9 +110,10 @@ if __name__ == '__main__':
 
 
     results_dir = os.path.join("./results", config["name"])
-    trace_filename = os.path.join(results_dir, f"pymc_trace_{args.year}_horizon_{config['model_kwargs']['forecast_horizon']}d.nc")
+    year = config["year"]
+    trace_filename = os.path.join(results_dir, f"pymc_trace_{year}_horizon_{config['model_kwargs']['forecast_horizon']}d.nc")
     figure_dir = os.path.join(results_dir, "figures")
-    figure_paths = [os.path.join(figure_dir, f"{state}_{args.year}_forecast.pdf") for state in VALID_LOCATIONS]
+    figure_paths = [os.path.join(figure_dir, f"{state}_{year}_forecast.pdf") for state in VALID_LOCATIONS]
     summary_path = os.path.join(results_dir, "fit_summary.csv")
 
     polling_data, colmap = load_dataset(args.dataset)
@@ -123,21 +125,23 @@ if __name__ == '__main__':
         config["year"],
         config["model_name"],
         polling_data,
+        config["forecast_kwargs"],
         config["pymc"],
         config["model_kwargs"]
     )
     os.makedirs(figure_dir, exist_ok=True)
-    for state, figure_path in zip(VALID_LOCATIONS, figure_paths):
+    for state, figure_path in sorted(zip(VALID_LOCATIONS, figure_paths), key=op.itemgetter(0)):
         generate_state_forecast_figure(
             colmap,
             state,
             figure_path,
             trace,
             polling_data,
+            config["forecast_kwargs"],
             config["model_kwargs"]["forecast_horizon"],
             config["year"],
             forecaster.time_window_days,
             args.regenerate_figures
         )
 
-    evaluate_forecast(trace, colmap, polling_data.filter_polls(year=args.year), results_dir)
+    evaluate_forecast(trace, colmap, polling_data.filter_polls(year=year), results_dir)

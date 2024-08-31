@@ -73,7 +73,8 @@ class FlatPollDataset(object): # converts a "one candidate per row" dataset into
             pres_polls = self.data[self.data['state_cd'] == state] 
         return pres_polls
     
-    
+    def get_election_result(self, year, state):
+        return self.election_results.get_election_result(year, state)
 
 class PollsterDataset(object):
     def __init__(self, path="./data/Pollster_Stats_Full_2024.xlsx", sheet_name="pollster-stats-full-june-2024"):
@@ -141,3 +142,6 @@ class TwoPartyElectionResultDataset(object):
         final_results[columns_to_fill] = final_results.groupby('year')[columns_to_fill].bfill()
 
         self.data = final_results
+
+    def get_election_result(self, year, state):
+       return self.data.loc[(self.data["state_po"] == state) & (self.data["year"] == year), ["DEM_actual", "REP_actual"]]

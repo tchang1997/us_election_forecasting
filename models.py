@@ -13,8 +13,11 @@ class ElectionForecaster(object):
             self,
             colmap,
             time_window_days: Optional[int] = 1,
+            max_backcast: Optional[int] = 60, # use a max. of two months of polling data from before
+
         ):
         self.time_window_days = time_window_days
+        self.max_backcast = max_backcast
         self.election_date_col = colmap["election_date"] 
         self.poll_date_col = colmap["poll_date"]
         self.dem_pct_col = colmap["dem_pct"]
@@ -28,14 +31,14 @@ class PollOnlyModel(ElectionForecaster):
         self.year = year
         self.aggregator = aggregator(TWO_PARTY_COLMAP)
 
-    def get_windows_to_election(self, df: pd.DataFrame, forecast_horizon: int, max_backcast: int):
+    def get_windows_to_election(self, df: pd.DataFrame, forecast_horizon: int):
         if not pd.api.types.is_datetime64_any_dtype(df[self.election_date_col]):
             df[self.election_date_col] = pd.to_datetime(df[self.election_date_col], format='%m/%d/%y')
         if not pd.api.types.is_datetime64_any_dtype(df[self.poll_date_col]):
             df[self.poll_date_col] = pd.to_datetime(df[self.poll_date_col], format='%m/%d/%y')
         
         tte = df[self.election_date_col] - df[self.poll_date_col]
-        max_timedelta = min(tte.max(), pd.Timedelta(days=forecast_horizon + max_backcast))
+        max_timedelta = min(tte.max(), pd.Timedelta(days=forecast_horizon + self.max_backcast))
         bins = pd.timedelta_range(start='0D', end=max_timedelta + pd.Timedelta(days=self.time_window_days), freq=f'{self.time_window_days}D')
         binned = pd.cut(tte, bins=bins, labels=np.arange(len(bins) - 1), include_lowest=True)
         windows_to_election = binned.dropna().astype(int)
@@ -125,7 +128,6 @@ class PollOnlyModel(ElectionForecaster):
         self,
         data: PollDataset,
         forecast_horizon: int,
-        max_backcast: int
     ) -> Tuple[pd.DataFrame, pd.Series, pd.Series, pd.Series]:
         # get polls for appropriate year
         df = data.filter_polls(year=self.year)
@@ -134,7 +136,6 @@ class PollOnlyModel(ElectionForecaster):
         windows_to_election, time_coords, dropped = self.get_windows_to_election(
             df,
             forecast_horizon=forecast_horizon,
-            max_backcast=max_backcast
         ) # time-to-election index
 
         # get final cohort of polls
@@ -173,12 +174,11 @@ class PollOnlyModel(ElectionForecaster):
             national_variance_prior_bias: Optional[float] = 1e-4,
             national_variance_prior_sigma: Optional[float] = 0.1,
             national_final_variance: Optional[float] = 1e-6,
-            max_backcast: Optional[int] = 60, # use a max. of two months of polling data from before
         ): # default: one week out. max_windows_back should be deprecated
 
         print("Preprocessing data...")
         # applies exclusion criteria based on forecast horizon, how far back to consider polls, and others (e.g. null sample size, banned pollsters)
-        included_polls, time_idx, time_coords, poll_inclusion_criteria = self.apply_poll_exclusions(data, forecast_horizon, max_backcast)
+        included_polls, time_idx, time_coords, poll_inclusion_criteria = self.apply_poll_exclusions(data, forecast_horizon)
 
         polling_weights = None # TODO: compute one for each row of df_time_subset.loc[poll_inclusion_criteria], as a function of time and pollster rating 
         

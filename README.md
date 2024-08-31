@@ -45,15 +45,17 @@ Our model is largely based on Drew Linzer's Votamatic model, described in ["Dyna
 
 ## Forecast validation
 
-All models are fitted on polling data sourced via 538 archives. Model selection for 2024 is done based on results for the 2020 and 2016 elections based on the average number of correct states, which forgives larger polling errors in safe states, followed by the electoral vote forecast error. Metrics for each model are averaged over all forecasts for a single model.
+All models are fitted on polling data sourced via 538 archives. Model selection for 2024 is done based on results for the 2020 and 2016 elections based on the average number of correct states, which forgives larger polling errors in safe states, followed by the electoral vote forecast error. Metrics for each model are averaged over all forecasts for a single model. For faster iteration, for initial model selection, we only sample 2000 samples (except for the polls-only approach, when I didn't know better). 
 
 Once model selection is finished, I'll release some 2024 forecasts.
 
 ### 2020 Election
 
+As a reference, the FiveThirtyEight forecast predicted a 52.9% - 45.9% margin one month out with a 333 - 205 EV victory. 
+
 |Model|(D) Win Prob.|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|
 |----|----|----|----|----|----|----|
-|Polls-only, one month out|||||||
+|Polls-only, one month out|91.1%|318.9|306|219.1|232|48|
 
 ### 2016 Election
 
