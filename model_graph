@@ -1,9 +1,9 @@
 digraph {
 	subgraph "clusterlocation (54)" {
-		rep_time_var [label="rep_time_var
+		dem_time_var [label="dem_time_var
 ~
 HalfStudentT" shape=ellipse]
-		dem_time_var [label="dem_time_var
+		rep_time_var [label="rep_time_var
 ~
 HalfStudentT" shape=ellipse]
 		label="location (54)" labeljust=r labelloc=b style=rounded
@@ -12,73 +12,73 @@ HalfStudentT" shape=ellipse]
 ~
 HalfStudentT" shape=ellipse]
 	subgraph "clustertime (35)" {
-		rep_national [label="rep_national
-~
-RandomWalk" shape=ellipse]
-		dem_national [label="dem_national
-~
-RandomWalk" shape=ellipse]
 		dem_national_time_effects [label="dem_national_time_effects
 ~
 RandomWalk" shape=ellipse]
 		rep_national_time_effects [label="rep_national_time_effects
 ~
 RandomWalk" shape=ellipse]
+		dem_national [label="dem_national
+~
+RandomWalk" shape=ellipse]
+		rep_national [label="rep_national
+~
+RandomWalk" shape=ellipse]
 		label="time (35)" labeljust=r labelloc=b style=rounded
 	}
 	subgraph "clustertime (35) x location (54)" {
-		dem_pi [label="dem_pi
-~
-Deterministic" shape=box]
 		rep_pi [label="rep_pi
 ~
 Deterministic" shape=box]
-		dem_time_effects [label="dem_time_effects
+		dem_pi [label="dem_pi
+~
+Deterministic" shape=box]
+		rep_time_effects [label="rep_time_effects
 ~
 RandomWalk" shape=ellipse]
-		rep_time_effects [label="rep_time_effects
+		dem_time_effects [label="dem_time_effects
 ~
 RandomWalk" shape=ellipse]
 		label="time (35) x location (54)" labeljust=r labelloc=b style=rounded
 	}
 	subgraph cluster35 {
-		dem_pi_national [label="dem_pi_national
+		rep_pi_national [label="rep_pi_national
 ~
 Deterministic" shape=box]
-		rep_pi_national [label="rep_pi_national
+		dem_pi_national [label="dem_pi_national
 ~
 Deterministic" shape=box]
 		label=35 labeljust=r labelloc=b style=rounded
 	}
-	subgraph cluster1148 {
+	subgraph cluster923 {
+		rep_polling_param [label="rep_polling_param
+~
+Deterministic" shape=box]
 		dem_obs [label="dem_obs
 ~
 Binomial" shape=ellipse style=filled]
 		dem_polling_param [label="dem_polling_param
 ~
 Deterministic" shape=box]
-		rep_polling_param [label="rep_polling_param
-~
-Deterministic" shape=box]
 		rep_obs [label="rep_obs
 ~
 Binomial" shape=ellipse style=filled]
-		label=1148 labeljust=r labelloc=b style=rounded
+		label=923 labeljust=r labelloc=b style=rounded
 	}
-	subgraph cluster416 {
+	subgraph cluster595 {
+		dem_obs_national [label="dem_obs_national
+~
+Binomial" shape=ellipse style=filled]
 		rep_obs_national [label="rep_obs_national
 ~
 Binomial" shape=ellipse style=filled]
 		dem_polling_param_national [label="dem_polling_param_national
 ~
 Deterministic" shape=box]
-		dem_obs_national [label="dem_obs_national
-~
-Binomial" shape=ellipse style=filled]
 		rep_polling_param_national [label="rep_polling_param_national
 ~
 Deterministic" shape=box]
-		label=416 labeljust=r labelloc=b style=rounded
+		label=595 labeljust=r labelloc=b style=rounded
 	}
 	national_effect -> dem_national
 	national_effect -> rep_national
@@ -88,8 +88,8 @@ Deterministic" shape=box]
 	rep_time_var -> rep_national_time_effects
 	dem_national -> dem_pi
 	dem_time_effects -> dem_pi
-	rep_national -> rep_pi
 	rep_time_effects -> rep_pi
+	rep_national -> rep_pi
 	dem_national_time_effects -> dem_pi_national
 	rep_national_time_effects -> rep_pi_national
 	dem_pi -> dem_polling_param

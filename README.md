@@ -8,14 +8,14 @@ This is a hobby project for electoral forecasting! Don't take it too seriously, 
 
 **Higher priority**
 * Add results for monthly forecasts up to 6 months out, back-casting 2 months, then weekly for final month
-* Fix national forecast -- separate it from the state effects matrix
+* ~Fix national forecast -- separate it from the state effects matrix~
 * Pollster-specific effects (*e.g.*, house-effects, RV vs. LV)
 * Add "polls-plus" capability (*e.g.*, "fundamentals" like incumbency effects, economic indices, demographics via linkage to census data)
 
 **Moderate priority**
 * Add tipping point states to the report
-* Add ability to weight polls/pollsters differently by quality/time (note that this is distinct from a house-effect adjustment, which is tantamount to adjusting the polllster's "meann")
-* Different initial variances by state (*e.g.*, prior_precision as a vector)
+* Add ability to weight polls/pollsters differently by quality/time (note that this is distinct from a house-effect adjustment, which is tantamount to adjusting the polllster's "mean")
+* Different initial variances by state (*e.g.*, prior_precision as a vector) -- to model state elasticity
 * ~Different variance priors (*e.g.*, half-Cauchy?)~
 
 **Low priority**
@@ -44,7 +44,7 @@ For initial testing, we use the Silver Bulletin dataset.The dataset contains 3,0
 
 Our model is largely based on Drew Linzer's Votamatic model, described in ["Dynamic Bayesian Forecasting of Presidential Elections in the States" (2013)](https://votamatic.org/wp-content/uploads/2013/07/Linzer-JASA13.pdf), with a few "because I can" style modifications. Essentially, this model places a multivariate Gaussian random walk prior on a "state-level" and "national-level" effect variable. Notably, we don't constrain the covariance to be diagonal, which naturally allows for modeling correlations between states (but runs some risks -- that's a lot of parameters). We then combine the state and national-level effects to output probabilistic forecasts of state and national voting averages at each timepoint.
 
-By default, we only consider polls up to two months back from the 
+By default, we only consider polls up to two months back from the forecast horizon (*e.g.*, we use August and September polls for a "start of October" forecast). 
 
 ## Forecast validation
 
@@ -58,9 +58,15 @@ As a reference, the FiveThirtyEight forecast predicted a 52.9% - 45.9% margin on
 
 |Model|(D) Win Prob.|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|
 |----|----|----|----|----|----|----|
-|Polls-only, one month out|91.1%|318.9|306|219.1|232|48|
+|Polls-only, one month out|>99.9%|306.3|306|231.7|232|47|
 
 ### 2016 Election
+
+As a reference, the FiveThirtyEight forecast predicted a 52.9% - 45.9% margin one month out with a 329.2 - 208.7 EV victory. 
+
+|Model|(D) Win Prob.|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|
+|----|----|----|----|----|----|----|
+|Polls-only, one month out|92.5%|320.3|232|217.7|306|88.3|45|
 
 Coming soon!
 

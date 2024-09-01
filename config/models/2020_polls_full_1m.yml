@@ -13,9 +13,9 @@ model_kwargs:
   prior_precision: 5
   prior_type: "half_t"
   state_variance_prior_bias: 1.0e-4
-  state_variance_prior_sigma: 0.3
+  state_variance_prior_sigma: 1
   national_variance_prior_bias: 1.0e-4
-  national_variance_prior_sigma: 0.1
+  national_variance_prior_sigma: 0.5
   national_final_variance: 1.0e-6
 forecast_kwargs:
   max_backcast: 90

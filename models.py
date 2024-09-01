@@ -209,7 +209,7 @@ class PollOnlyModel(ElectionForecaster):
 
         # get final cohort of polls
         df_time_subset = df.loc[~dropped]
-        earliest = df_time_subset[self.poll_date_col].min().strftime("%m/%d/%y")
+        earliest = convert_col_to_date(df_time_subset[self.poll_date_col]).min().strftime("%m/%d/%y")
         print("Considering", len(df_time_subset), "polls from", earliest, "onward")
         
         null_sample_size = pd.isnull(df_time_subset[self.sample_size_col])
@@ -217,6 +217,7 @@ class PollOnlyModel(ElectionForecaster):
 
         poll_inclusion_criteria = (windows_to_election >= forecast_horizon) & ~null_sample_size
         time_idx = windows_to_election[poll_inclusion_criteria] # note that n windows out = pi[n]
+        print("Final poll pool size:", poll_inclusion_criteria.sum())
         return df_time_subset, time_idx, time_coords, poll_inclusion_criteria
     
     def get_election_result_priors(self, us_mask):
@@ -347,7 +348,148 @@ class PollOnlyModel(ElectionForecaster):
         return model, trace, summary_df
         
 class PollsAdjustedModel(ElectionForecaster): 
-    pass # house effects, but no fundamentals
+    def get_coords_and_indices(self, polls, time_coords, time_idx):
+        """
+        Compute coordinates and indices for the PyMC model.
+
+        This method generates the basic coordinates and indices for the poll-only model.
+        Subclasses should override this method to add their own coordinates and indices
+        specific to their model structure.
+
+        Args:
+            polls (pd.DataFrame): The polling data.
+            time_coords (np.array): Array of time coordinates.
+            time_idx (np.array): Array of time indices.
+
+        Returns:
+            tuple: A tuple containing two dictionaries:
+                - COORDS: Dictionary of coordinates for the PyMC model.
+                - INDICES: Dictionary of indices for the PyMC model.
+        """
+
+        # other factors can be created by factorizing a column more directly, but we need to treat location specially. Time indices need to be pre-computed.
+        raw_location_idx = polls[self.location_col]
+        _, loc = raw_location_idx.factorize(sort=True)
+        # TODO: add lv/rv and pollster ID effects
+        pollster_idx, pollster_coords = polls[self.pollster_col].factorize(sort=True)
+        poll_type_idx, poll_type_coords = polls[self.polled_population_col].factorize(sort=True)
+
+
+        COORDS = {
+            "location": loc.drop("US"), # coordinates only for states and CDs -- we model national in a separate average. I'm not 100% convinced this is the right approach, since this means national-level errors aren't directly correlated w/ state errors in our model.
+            "time": time_coords,
+        }
+        
+        loc_idx_no_us, _ = raw_location_idx.drop("US").factorize(sort=True) 
+        is_national_poll = (raw_location_idx == "US")
+        INDICES = {
+            "national": {
+                "time": time_idx[is_national_poll], # indices of time in main polling DF, national polls only
+            },
+            "state": {
+                "location": loc_idx_no_us, # indices of states in main polling DF, non-national polls only
+                "time": time_idx[~is_national_poll], # indices of time window (e.g., "# days") in main polling DF, non-national polls only
+            }
+        }
+        return COORDS, INDICES
+
+    # house effects, but no fundamentals
+    def fit(
+            self,
+            data: PollDataset,
+            n_samples: Optional[int] = 2000,
+            n_chains: Optional[int] = 2,
+            n_cores: Optional[int] = 4,
+            n_tune_steps: Optional[int] = 1000,
+            target_accept: Optional[float] = 0.99,
+            max_treedepth: Optional[int] = 13,
+            forecast_horizon: Optional[int] = 7,
+            prior_precision: Optional[float] = 5,
+            prior_type: Optional[str] = "half_t",
+            state_variance_prior_bias: Optional[float] = 1e-4,
+            state_variance_prior_sigma: Optional[float] = 0.3,
+            national_variance_prior_bias: Optional[float] = 1e-4,
+            national_variance_prior_sigma: Optional[float] = 0.1,
+            national_final_variance: Optional[float] = 1e-6,
+        ): # default: one week out. max_windows_back should be deprecated
+
+        print("Preprocessing data...")
+        # (1/4) Applies exclusion criteria based on forecast horizon, how far back to consider polls, and others (e.g. null sample size, banned pollsters)
+        included_polls, time_idx, time_coords, poll_inclusion_criteria = self.apply_poll_exclusions(data, forecast_horizon)
+
+        polling_weights = None # TODO: compute one for each row of df_time_subset.loc[poll_inclusion_criteria], as a function of time and pollster rating 
+        
+        # (2/4) Get observed poll values
+        national_obs_n, national_emp_dem_n, national_emp_rep_n, \
+        state_obs_n, state_emp_dem_n, state_emp_rep_n = self.get_observed_poll_values(
+            included_polls,
+            poll_inclusion_criteria
+        )
+        print("Initiating modeling...")
+        
+        # (3/4) Compute priors for final results
+        _, raw_state_idx = included_polls.loc[poll_inclusion_criteria, self.location_col].factorize(sort=True)
+        us_mask = (raw_state_idx == "US")
+        d_avg_us, r_avg_us, d_avg_states, r_avg_states = self.get_election_result_priors(us_mask)
+
+        # (4/4) Get coordinates and indices for PyMC model
+        COORDS, INDICES = self.get_coords_and_indices(included_polls.loc[poll_inclusion_criteria], time_coords, time_idx)
+
+        with pm.Model(coords=COORDS) as model:
+            dem_state_var, rep_state_var, sigma_delta = self.create_variance_priors(
+                prior_type,
+                state_variance_prior_sigma, 
+                state_variance_prior_bias, 
+                national_variance_prior_sigma, 
+                national_variance_prior_bias
+            )
+
+            # National-level effect (delta)            
+            dem_national_effects, rep_national_effects = self.create_national_effects(sigma_delta, national_final_variance)
+            dem_state_time_effects, rep_state_time_effects, \
+            dem_national_time_effects, rep_national_time_effects = self.create_state_effects(
+                d_avg_us, 
+                r_avg_us,
+                d_avg_states,
+                r_avg_states, 
+                len(COORDS["location"]), 
+                prior_precision, 
+                prior_precision, # same precision for state + national
+                dem_state_var, 
+                rep_state_var
+            )
+            # Here, we can add additional effects in subclasses
+
+            # This function would be overridden in subclasses
+            dem_polling_param, rep_polling_param, national_dem_polling_param, national_rep_polling_param = self.create_polling_parameters(
+                dem_state_time_effects, 
+                rep_state_time_effects, 
+                dem_national_effects, 
+                rep_national_effects, 
+                dem_national_time_effects,
+                rep_national_time_effects,
+                INDICES, 
+            )
+            self.create_state_likelihood(
+                state_obs_n,
+                dem_polling_param,
+                rep_polling_param,
+                state_emp_dem_n,
+                state_emp_rep_n
+            )
+            self.create_national_likelihood(
+                national_obs_n,
+                national_dem_polling_param,
+                national_rep_polling_param,
+                national_emp_dem_n,
+                national_emp_rep_n
+            )
+            pm.model_to_graphviz().render(filename='model_graph')
+            print("Check model_graph.pdf to make sure the model specification is correct.")
+            trace = pm.sample(n_samples, tune=n_tune_steps, cores=n_cores, chains=n_chains, step=pm.NUTS(target_accept=target_accept, max_treedepth=max_treedepth)) # be able to configure this
+            summary_df = pm.summary(trace)
+        
+        return model, trace, summary_df
 
 class PollsPlusAdjustedModel(ElectionForecaster):
     pass # fundamentals + house effects
