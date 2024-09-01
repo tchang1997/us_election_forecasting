@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -11,9 +13,21 @@ TWO_PARTY_COLMAP = {
     "year": "year"
 }
 class PollDataset(object):
-    def __init__(self, path="./data/Rawpolls_061224.xlsx", sheet_name="rawpolls"):
+    def __init__(
+        self,
+        path: str = "./data/Rawpolls_061224.xlsx",
+        sheet_name: str = "rawpolls",
+    ):
         self.path = path
-        self.data = pd.read_excel(path, sheet_name=sheet_name)
+        _, ext = os.path.splitext(path)
+        if ext == ".xlsx":
+            self.data = pd.read_excel(path, sheet_name=sheet_name)
+        elif ext == ".csv":
+            self.data = pd.read_csv(path, low_memory=False)
+            
+        else:
+            raise ValueError(f"Unsupported file format: {ext}")
+    
 
     def filter_polls(self, type="Pres-G", year=None, state=None):
         if not is_valid_location(state) or not is_valid_year(year):
@@ -35,11 +49,61 @@ class PollDataset(object):
         results = race_polls.drop_duplicates()
         return results
     
-class FlatPollDataset(object): # converts a "one candidate per row" dataset into the format of PollDataset
+class SimpleElectionQueryMixin:
+    def filter_polls(self, year=None, state=None):
+        if not is_valid_location(state) or not is_valid_year(year):
+            raise ValueError(f"Invalid year or state: year={year}, state={state}")
+        pres_polls = self.data
+        if year is not None and state is not None:
+            pres_polls = self.data[(self.data['cycle'] == year) & (self.data['state_cd'] == state)]
+        elif year is not None: # but state is None
+            pres_polls = self.data[self.data['cycle'] == year]
+        elif state is not None: # but year is None
+            pres_polls = self.data[self.data['state_cd'] == state] 
+        return pres_polls
+    
+    def get_election_result(self, year, state):
+        return self.election_results.get_election_result(year, state)
+
+    
+class FiveThirtyEightPollDataset(PollDataset, SimpleElectionQueryMixin):
+    def __init__(
+        self,
+        path: str = "./data/president_general_polls_2016.csv",
+    ):
+        super().__init__(path)
+        self.data = self.data[self.data["type"] == "polls-only"] # 2016 538 data has polls in triplicate for each version of adjusted values
+        
+        # convert state names to state codes
+        self.data["state_cd"] = self.data["state"].map(STATE_ABBREVIATIONS).fillna("US")
+
+        self.election_results = TwoPartyElectionResultDataset()
+        results_only = self.election_results.data.loc[:, ["year", "state_po", "DEM_actual", "REP_actual"]]
+        # join using state_po <-> state_cd and year <-> cycle as a key
+        self.data = pd.merge(
+            self.data,
+            results_only,
+            left_on=['cycle', 'state_cd'],
+            right_on=['year', 'state_po'],
+            how='left'
+        )
+
+    def filter_polls(self, year=None, state=None):
+        if not is_valid_location(state) or not is_valid_year(year):
+            raise ValueError(f"Invalid year or state: year={year}, state={state}")
+        if year is not None and state is not None:
+            pres_polls = self.data[(self.data['cycle'] == year) & (self.data['state_cd'] == state)]
+        elif year is not None: # but state is None
+            pres_polls = self.data[self.data['cycle'] == year]
+        elif state is not None: # but year is None
+            pres_polls = self.data[self.data['state_cd'] == state] 
+        return pres_polls
+    
+class FlatPollDataset(PollDataset, SimpleElectionQueryMixin): # converts a "one candidate per row" dataset into the format of PollDataset
     def __init__(self, path="./data/president_polls_historical.csv", **result_paths):
+        super().__init__(path)
         self.path = path
-        self.raw_data = pd.read_csv(path, low_memory=False)
-        df = self.raw_data[self.raw_data["answer"].isin(TWO_PARTY_CANDIDATES)].dropna(how="all", axis=1)
+        df = self.data[self.data["answer"].isin(TWO_PARTY_CANDIDATES)].dropna(how="all", axis=1)
         df_pivot = df.pivot(
             index=[col for col in df.columns if col not in ['candidate_name', 'pct', 'candidate_id', 'party', 'answer']],
             columns='party',  # Pivot on the party column to create new columns for each candidate
@@ -61,20 +125,6 @@ class FlatPollDataset(object): # converts a "one candidate per row" dataset into
             how='left'
         )
 
-    def filter_polls(self, year=None, state=None):
-        if not is_valid_location(state) or not is_valid_year(year):
-            raise ValueError(f"Invalid year or state: year={year}, state={state}")
-        pres_polls = self.data
-        if year is not None and state is not None:
-            pres_polls = self.data[(self.data['cycle'] == year) & (self.data['state_cd'] == state)]
-        elif year is not None: # but state is None
-            pres_polls = self.data[self.data['cycle'] == year]
-        elif state is not None: # but year is None
-            pres_polls = self.data[self.data['state_cd'] == state] 
-        return pres_polls
-    
-    def get_election_result(self, year, state):
-        return self.election_results.get_election_result(year, state)
 
 class PollsterDataset(object):
     def __init__(self, path="./data/Pollster_Stats_Full_2024.xlsx", sheet_name="pollster-stats-full-june-2024"):

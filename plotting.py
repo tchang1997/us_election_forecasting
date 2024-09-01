@@ -65,6 +65,7 @@ def plot_forecast(
     dates_list = np.vectorize(lambda x: x.strftime('%m/%d/%Y'))(raw_dates)
     dates_list[0] += "\n(Election Day)"
 
+    # TODO: fix tick display and calculation.
     ax.set_xticks(range(0, len(dates_list), tick_every))
     ax.set_xticklabels(dates_list[::tick_every][::-1], rotation=45)
     ax.set_xlim((0, len(dem_mean) - 1))
@@ -77,6 +78,7 @@ def plot_forecast(
         if not pd.api.types.is_datetime64_any_dtype(polling_data[colmap["poll_date"]]):
             poll_dates = pd.to_datetime(polling_data[colmap["poll_date"]], format='%m/%d/%y')
         
+        # TODO: fix poll_x calculation for window_size > 1
         poll_x = (poll_dates.map(lambda x: x.toordinal()) - raw_dates.min().toordinal()) / (raw_dates.max().toordinal() - raw_dates.min().toordinal()) * len(raw_dates)
         ax.scatter(poll_x, polling_data[colmap["dem_pct"]], color="blue", alpha=0.2)
         ax.scatter(poll_x, polling_data[colmap["rep_pct"]], color="red", alpha=0.2)

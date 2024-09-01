@@ -9,7 +9,7 @@ import pandas as pd
 import pymc as pm
 from ruamel.yaml import YAML
 
-from election_data import PollDataset, FlatPollDataset
+from election_data import PollDataset, FlatPollDataset, FiveThirtyEightPollDataset
 import models
 from plotting import plot_forecast
 from reporting import calculate_ev_forecast, calculate_forecast_metrics, print_forecast_table
@@ -43,7 +43,7 @@ def evaluate_forecast(
 def get_args():
     psr = argparse.ArgumentParser()
     psr.add_argument('--config', type=str, required=True, help='Path to the configuration file')
-    psr.add_argument('--dataset', type=str, default='small', choices=['small', 'full'], help='Dataset to use.')
+    psr.add_argument('--dataset', type=str, default='small', choices=['small', 'full', 'full_2016'], help='Dataset to use.')
     psr.add_argument('--overwrite', action='store_true', help='Overwrite existing results directory')
     psr.add_argument('--regenerate_figures', action='store_true', help='Regenerate existing figures')
     return psr.parse_args()
@@ -56,6 +56,8 @@ def load_dataset(dataset_name):
         polling_data = PollDataset() # automatically loads the Silver dataset. In the future allow configuration
     elif dataset_name == "full":
         polling_data = FlatPollDataset()
+    elif dataset_name == "full_2016":
+        polling_data = FiveThirtyEightPollDataset()
     else:
         raise ValueError(f"Invalid dataset: {dataset_name}")
     return polling_data, colmap

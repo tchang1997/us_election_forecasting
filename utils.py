@@ -21,7 +21,7 @@ STATE_ABBREVIATIONS = {
     'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
     'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY',
     'District of Columbia': 'DC', 'Maine CD-1': 'M1', 'Maine CD-2': 'M2', 
-    'Nebraska CD-2': 'N2'
+    'Nebraska CD-2': 'N2', "U.S.": "US" # include national poll abbreviations
 }
 
 
@@ -94,6 +94,6 @@ def preprocess_for_plotting(trace, polling_data, colmap, forecast_horizon, year,
     bins = pd.timedelta_range(start='0D', end=max_timedelta + pd.Timedelta(days=time_window_days), freq=f'{time_window_days}D') # don't repeat self...sigh TODO: make less hacky
     windows_to_election = pd.cut(tte, bins=bins, labels=np.arange(len(bins) - 1), include_lowest=True).astype(int)
 
-    state_mask = (windows_to_election >= forecast_horizon) & (filtered_polling_data[colmap["location"]] == state)
+    state_mask = (windows_to_election >= forecast_horizon) & (filtered_polling_data[colmap["location"]] == state) & ()
     polling_data_until_forecast = filtered_polling_data[state_mask]
     return dem_pi, rep_pi, forecast_horizon, header, state_idx, election_result, polling_data_until_forecast

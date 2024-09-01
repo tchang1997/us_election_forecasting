@@ -36,6 +36,10 @@ class HistoricalAverage(Aggregator): # average of past election results, histori
         """
         Calculate the historical average of election results for each location.
 
+        There's several limitations to this kind of aggregation; i.e., anchoring to the raw vote percentages. For example, it could overindex to
+        popular candidates (e.g., 2008 Obama), or deflate the priors in years with unusually strong third-parties (e.g., 2016). A future version
+        might apply some "regression towards AR mean" type smoothing to ensure that outlier-like results don't influence the prior too severely.
+
         Args:
             df (pd.DataFrame): DataFrame containing historical election data.
             max_year (int): The most recent year to consider (exclusive).

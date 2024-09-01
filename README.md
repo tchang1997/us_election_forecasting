@@ -7,7 +7,8 @@ This is a hobby project for electoral forecasting! Don't take it too seriously, 
 ### Development roadmap
 
 **Higher priority**
-* Add full forecasts for ~2020~ and 2016 (monthly up to 6 months out, then weekly for final month)
+* Add results for monthly forecasts up to 6 months out, back-casting 2 months, then weekly for final month
+* Fix national forecast -- separate it from the state effects matrix
 * Pollster-specific effects (*e.g.*, house-effects, RV vs. LV)
 * Add "polls-plus" capability (*e.g.*, "fundamentals" like incumbency effects, economic indices, demographics via linkage to census data)
 

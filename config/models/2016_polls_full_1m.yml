@@ -1,15 +1,15 @@
-name: "polls_only_2020_30d"
+name: "polls_only_2016_30d"
 model_name: "PollOnlyModel"
-year: 2020
+year: 2016
 pymc:
-  n_samples: 2500 # change to 500 for future model selection
+  n_samples: 500 # change to 500 for future model selection
   n_chains: 4
   n_cores: 4
   n_tune_steps: 1000
   target_accept: 0.99
   max_treedepth: 13
 model_kwargs:
-  forecast_horizon: 30
+  forecast_horizon: 10
   prior_precision: 5
   prior_type: "half_t"
   state_variance_prior_bias: 1.0e-4
