@@ -7,7 +7,7 @@ pymc:
   n_cores: 4
   n_tune_steps: 1000
   target_accept: 0.99
-  max_treedepth: 13
+  max_treedepth: 12
 model_kwargs:
   forecast_horizon: 10 # note that the forecast horizon in days is time_window_days * forecast_horizon!
   prior_precision: 5

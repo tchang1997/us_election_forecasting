@@ -6,29 +6,52 @@ from rich.text import Text
 
 from utils import VALID_CONGRESSIONAL_DISTRICTS, VALID_US_STATES, ELECTORAL_VOTES_2010, EV_TO_WIN, TOTAL_EV
 
-def calculate_forecast_metrics(colmap, pred_dem, pred_rep, actual_results, locations):# Calculate mean and standard error for each location
+def calculate_forecast_metrics(
+    colmap: dict,
+    pred_dem: np.ndarray,
+    pred_rep: np.ndarray,
+    pred_dem_national: np.ndarray,
+    pred_rep_national: np.ndarray,
+    actual_results: pd.DataFrame,
+    locations: np.ndarray
+) -> dict:
+    # Calculate mean and standard error for each location
     pred_dem_mean = pred_dem.mean(axis=(0, 1))
     pred_dem_se = pred_dem.std(axis=(0, 1)) / (pred_dem.shape[0] * pred_dem.shape[1])**0.5
     pred_rep_mean = pred_rep.mean(axis=(0, 1))
     pred_rep_se = pred_rep.std(axis=(0, 1)) / (pred_rep.shape[0] * pred_rep.shape[1])**0.5
-    dem_win_prob = (pred_dem > pred_rep).mean(axis=(0, 1)) 
+    dem_win_prob = (pred_dem > pred_rep).mean(axis=(0, 1))
+
+    # Calculate mean and standard error for national prediction
+    pred_dem_national_mean = pred_dem_national.mean(axis=(0, 1))
+    pred_dem_national_se = pred_dem_national.std(axis=(0, 1)) / (pred_dem_national.shape[0] * pred_dem_national.shape[1])**0.5
+    pred_rep_national_mean = pred_rep_national.mean(axis=(0, 1))
+    pred_rep_national_se = pred_rep_national.std(axis=(0, 1)) / (pred_rep_national.shape[0] * pred_rep_national.shape[1])**0.5
+    dem_national_win_prob = (pred_dem_national > pred_rep_national).mean(axis=(0, 1))
+
+    full_dem_preds = pd.concat([pred_dem_mean.to_pandas(), pd.Series(pred_dem_national_mean.values, index=["US"])], axis=0)
+    full_rep_preds = pd.concat([pred_rep_mean.to_pandas(), pd.Series(pred_rep_national_mean.values, index=["US"])], axis=0)
+    full_dem_se = pd.concat([pred_dem_se.to_pandas(), pd.Series(pred_dem_national_se.values, index=["US"])], axis=0)
+    full_rep_se = pd.concat([pred_rep_se.to_pandas(), pd.Series(pred_rep_national_se.values, index=["US"])], axis=0)
+    full_dem_win_prob = pd.concat([dem_win_prob.to_pandas(), pd.Series(dem_national_win_prob.values, index=["US"])], axis=0)
+    
     # Compute signed error for each location
-    dem_signed_error = actual_results[colmap["dem_actual"]] - pred_dem_mean * 100
-    rep_signed_error = actual_results[colmap["rep_actual"]] - pred_rep_mean * 100
+    dem_signed_error = actual_results[colmap["dem_actual"]] - full_dem_preds * 100
+    rep_signed_error = actual_results[colmap["rep_actual"]] - full_rep_preds * 100
 
     dem_winners = (actual_results[colmap["dem_actual"]] > actual_results[colmap["rep_actual"]])
-    forecast_dem_winners = pd.Series((pred_dem_mean > pred_rep_mean), index=dem_winners.index)
+    forecast_dem_winners = pd.Series((full_dem_preds > full_rep_preds), index=dem_winners.index)
 
     raw_forecast_data = {
         'location': locations,
-        'd_pred_mean': pred_dem_mean * 100,
-        'd_pred_se': pred_dem_se * 100,
-        'r_pred_mean': pred_rep_mean * 100,
-        'r_pred_se': pred_rep_se * 100,
-        'margin': (pred_dem_mean - pred_rep_mean) * 100,
-        'margin_se': np.sqrt(pred_dem_se**2 + pred_rep_se**2) * 100,
-        'd_win_prob': dem_win_prob * 100,
-        'r_win_prob': (1 - dem_win_prob) * 100,
+        'd_pred_mean': full_dem_preds * 100,
+        'd_pred_se': full_dem_se * 100,
+        'r_pred_mean': full_rep_preds * 100,
+        'r_pred_se': full_rep_se * 100,
+        'margin': (full_dem_preds - full_rep_preds) * 100,
+        'margin_se': np.sqrt(full_dem_se**2 + full_rep_se**2) * 100,
+        'd_win_prob': full_dem_win_prob * 100,
+        'r_win_prob': (1 - full_dem_win_prob) * 100,
         'd_actual': actual_results[colmap["dem_actual"]].values,
         'd_error': dem_signed_error.values,
         'r_actual': actual_results[colmap["rep_actual"]].values,
@@ -37,6 +60,7 @@ def calculate_forecast_metrics(colmap, pred_dem, pred_rep, actual_results, locat
         'winner_actual': np.where(dem_winners, "D", "R"),
         'call_correct': (dem_winners == forecast_dem_winners),
     }
+
     return raw_forecast_data
 
 def prob_color(prob):

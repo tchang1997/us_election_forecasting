@@ -4,7 +4,7 @@ import pymc as pm
 
 from aggregator import Aggregator, HistoricalAverage
 from election_data import PollDataset, TwoPartyElectionResultDataset, TWO_PARTY_COLMAP
-from plotting import plot_forecast
+from utils import convert_col_to_date
 
 from typing import Dict, Optional, Tuple, Union
 
@@ -34,16 +34,9 @@ class PollOnlyModel(ElectionForecaster):
         if not pd.api.types.is_datetime64_any_dtype(df[self.election_date_col]):
             df[self.election_date_col] = pd.to_datetime(df[self.election_date_col], format='%m/%d/%y')
         if not pd.api.types.is_datetime64_any_dtype(df[self.poll_date_col]):
-            # HACK: Check if the poll date ends with YY or YYYY format
-            sample_date = df[self.poll_date_col].iloc[0] # assume this is representative
-            if sample_date[-2:].isdigit() and not sample_date[-4:].isdigit():
-                # YY format
-                df[self.poll_date_col] = pd.to_datetime(df[self.poll_date_col], format='%m/%d/%y')
-            else:
-                # YYYY format
-                df[self.poll_date_col] = pd.to_datetime(df[self.poll_date_col], format='%m/%d/%Y')
-        
-        tte = df[self.election_date_col] - df[self.poll_date_col]
+            poll_dates = convert_col_to_date(df[self.poll_date_col])
+            
+        tte = df[self.election_date_col] - poll_dates
         max_timedelta = min(tte.max(), pd.Timedelta(days=forecast_horizon + self.max_backcast))
         bins = pd.timedelta_range(start='0D', end=max_timedelta + pd.Timedelta(days=self.time_window_days), freq=f'{self.time_window_days}D')
         binned = pd.cut(tte, bins=bins, labels=np.arange(len(bins) - 1), include_lowest=True)
@@ -74,7 +67,7 @@ class PollOnlyModel(ElectionForecaster):
         raw_location_idx = polls.set_index(self.location_col).index
         _, loc = raw_location_idx.factorize(sort=True)
         COORDS = {
-            "location": loc.drop("US"), # coordinates only for states and CDs -- we model national in a separate average
+            "location": loc.drop("US"), # coordinates only for states and CDs -- we model national in a separate average. I'm not 100% convinced this is the right approach, since this means national-level errors aren't directly correlated w/ state errors in our model.
             "time": time_coords,
         }
         
@@ -290,7 +283,8 @@ class PollOnlyModel(ElectionForecaster):
         print("Initiating modeling...")
         
         # (3/4) Compute priors for final results
-        us_mask = (included_polls.loc[poll_inclusion_criteria, self.location_col] == "US")
+        _, raw_state_idx = included_polls.loc[poll_inclusion_criteria, self.location_col].factorize(sort=True)
+        us_mask = (raw_state_idx == "US")
         d_avg_us, r_avg_us, d_avg_states, r_avg_states = self.get_election_result_priors(us_mask)
 
         # (4/4) Get coordinates and indices for PyMC model

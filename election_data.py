@@ -48,25 +48,9 @@ class PollDataset(object):
         race_polls = self.data.loc[row_mask, ["cand1_actual", "cand2_actual"]]
         results = race_polls.drop_duplicates()
         return results
-    
-class SimpleElectionQueryMixin:
-    def filter_polls(self, year=None, state=None):
-        if not is_valid_location(state) or not is_valid_year(year):
-            raise ValueError(f"Invalid year or state: year={year}, state={state}")
-        pres_polls = self.data
-        if year is not None and state is not None:
-            pres_polls = self.data[(self.data['cycle'] == year) & (self.data['state_cd'] == state)]
-        elif year is not None: # but state is None
-            pres_polls = self.data[self.data['cycle'] == year]
-        elif state is not None: # but year is None
-            pres_polls = self.data[self.data['state_cd'] == state] 
-        return pres_polls
-    
-    def get_election_result(self, year, state):
-        return self.election_results.get_election_result(year, state)
 
     
-class FiveThirtyEightPollDataset(PollDataset, SimpleElectionQueryMixin):
+class FiveThirtyEightPollDataset(PollDataset):
     def __init__(
         self,
         path: str = "./data/president_general_polls_2016.csv",
@@ -99,7 +83,11 @@ class FiveThirtyEightPollDataset(PollDataset, SimpleElectionQueryMixin):
             pres_polls = self.data[self.data['state_cd'] == state] 
         return pres_polls
     
-class FlatPollDataset(PollDataset, SimpleElectionQueryMixin): # converts a "one candidate per row" dataset into the format of PollDataset
+        
+    def get_election_result(self, year, state):
+        return self.election_results.get_election_result(year, state)
+    
+class FlatPollDataset(PollDataset): # converts a "one candidate per row" dataset into the format of PollDataset
     def __init__(self, path="./data/president_polls_historical.csv", **result_paths):
         super().__init__(path)
         self.path = path
@@ -124,6 +112,22 @@ class FlatPollDataset(PollDataset, SimpleElectionQueryMixin): # converts a "one 
             right_on=['year', 'state_po'],
             how='left'
         )
+
+    # TODO: refactor these two into some mixin, perhaps?
+    def filter_polls(self, year=None, state=None):
+        if not is_valid_location(state) or not is_valid_year(year):
+            raise ValueError(f"Invalid year or state: year={year}, state={state}")
+        pres_polls = self.data
+        if year is not None and state is not None:
+            pres_polls = self.data[(self.data['cycle'] == year) & (self.data['state_cd'] == state)]
+        elif year is not None: # but state is None
+            pres_polls = self.data[self.data['cycle'] == year]
+        elif state is not None: # but year is None
+            pres_polls = self.data[self.data['state_cd'] == state] 
+        return pres_polls
+    
+    def get_election_result(self, year, state):
+        return self.election_results.get_election_result(year, state)
 
 
 class PollsterDataset(object):

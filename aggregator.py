@@ -55,7 +55,7 @@ class HistoricalAverage(Aggregator): # average of past election results, histori
             (state_results[self.year_col] >= max_year - years_back) & 
             state_results[self.location_col].isin(VALID_LOCATIONS)
         ]
-        d_avg = history.groupby(self.location_col)[self.dem_actual_col].mean() / 100 # TODO: make this prior customizable
-        r_avg = history.groupby(self.location_col)[self.rep_actual_col].mean() / 100
+        d_avg = history.groupby(self.location_col)[self.dem_actual_col].mean().sort_index() / 100 # TODO: make this prior customizable
+        r_avg = history.groupby(self.location_col)[self.rep_actual_col].mean().sort_index() / 100
         return d_avg.astype(float), r_avg.astype(float)
     

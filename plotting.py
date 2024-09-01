@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import pandas as pd
 
+from utils import convert_col_to_date
+
 from typing import Optional
 
 plt.rcParams["font.family"] = "serif"
@@ -14,6 +16,7 @@ def plot_forecast(
         dem_pi_sample,
         rep_pi_sample,
         forecast_horizon,
+        window_size,
         header,
         state_idx,
         election_result: Optional[pd.DataFrame] = None,
@@ -21,9 +24,12 @@ def plot_forecast(
         ci: Optional[float] = 95.,
         tick_every: Optional[int] = 3,
     ):
-
-    dem_pi_sample = dem_pi_sample[:, :, ::-1, state_idx]
-    rep_pi_sample = rep_pi_sample[:, :, ::-1, state_idx] # forward in time now
+    if state_idx is not None:
+        dem_pi_sample = dem_pi_sample[:, :, ::-1, state_idx]
+        rep_pi_sample = rep_pi_sample[:, :, ::-1, state_idx] # forward in time now
+    else:
+        dem_pi_sample = dem_pi_sample[:, :, ::-1]
+        rep_pi_sample = rep_pi_sample[:, :, ::-1] # forward in time now
 
     # compute mean and CI
     dem_mean = dem_pi_sample.mean(axis=(0, 1))
@@ -34,13 +40,12 @@ def plot_forecast(
     rep_ci = np.quantile(rep_pi_sample, ci_lower, axis=(0, 1)), np.quantile(rep_pi_sample, ci_upper, axis=(0, 1))
                         
     fig, ax = plt.subplots()
-
-    #first_row = orig_data.iloc[0]
-
     final_margin = dem_pi_sample[..., -1].mean() - rep_pi_sample[..., -1].mean()
     win_prob = (dem_pi_sample[..., -1] > rep_pi_sample[..., -1]).mean()
-
-    ax.set_title(header[colmap["dem_name"]] + " (D) vs. " + header[colmap["rep_name"]] + " (R), State: " + header[colmap["location"]] + f"\nFinal margin: D{100 * final_margin:+.1f} - Dem. Win: {win_prob * 100:.2f}%")
+    if colmap["dem_name"] in header.index and colmap["rep_name"] in header.index:
+        ax.set_title(header[colmap["dem_name"]] + " (D) vs. " + header[colmap["rep_name"]] + " (R), State: " + header[colmap["location"]] + f"\nFinal margin: D{100 * final_margin:+.1f} - Dem. Win: {win_prob * 100:.2f}%")
+    else:
+        ax.set_title("(D) vs. (R), State: " + header[colmap["location"]] + f"\nFinal margin: D{100 * final_margin:+.1f} - Dem. Win: {win_prob * 100:.2f}%")
     ax.yaxis.set_major_formatter(mtick.PercentFormatter())
 
     total_weeks = np.arange(len(dem_mean))
@@ -56,17 +61,17 @@ def plot_forecast(
 
     ax.set_xlabel("Date")
     ax.set_ylabel("Vote share (%)")
-    ax.vlines(len(dem_mean) - forecast_horizon, linestyle="dotted", color="black", ymin=0., ymax=100., label="Validation horizon")
+    ax.vlines(len(dem_mean) - forecast_horizon, linestyle="dotted", color="black", ymin=0., ymax=100., label="Forecast point")
     
     election_date = header[colmap["election_date"]]
     if isinstance(election_date, str):
-        election_date = pd.to_datetime(election_date, format='%m/%d/%y')
-    raw_dates = np.array([(election_date - pd.Timedelta(days=i)) for i in range(len(dem_mean))])
-    dates_list = np.vectorize(lambda x: x.strftime('%m/%d/%Y'))(raw_dates)
+        election_date = convert_col_to_date(election_date)
+    raw_dates = np.array([(election_date - pd.Timedelta(days=i) * window_size) for i in range(len(dem_mean))])
+    dates_list = np.vectorize(lambda x: x.strftime('%m/%d/%Y'))(raw_dates).astype(object)
     dates_list[0] += "\n(Election Day)"
 
-    # TODO: fix tick display and calculation.
-    ax.set_xticks(range(0, len(dates_list), tick_every))
+    xticks = range(0, len(dates_list), tick_every)
+    ax.set_xticks(xticks)
     ax.set_xticklabels(dates_list[::tick_every][::-1], rotation=45)
     ax.set_xlim((0, len(dem_mean) - 1))
 
@@ -76,10 +81,10 @@ def plot_forecast(
         # Convert poll_date to timestamp if it's not already
         poll_dates = polling_data[colmap["poll_date"]]
         if not pd.api.types.is_datetime64_any_dtype(polling_data[colmap["poll_date"]]):
-            poll_dates = pd.to_datetime(polling_data[colmap["poll_date"]], format='%m/%d/%y')
+            poll_dates = convert_col_to_date(polling_data[colmap["poll_date"]])
         
         # TODO: fix poll_x calculation for window_size > 1
-        poll_x = (poll_dates.map(lambda x: x.toordinal()) - raw_dates.min().toordinal()) / (raw_dates.max().toordinal() - raw_dates.min().toordinal()) * len(raw_dates)
+        poll_x = (poll_dates.map(lambda x: x.toordinal()) - raw_dates.min().toordinal()) / (raw_dates.max().toordinal() - raw_dates.min().toordinal()) * len(dates_list)
         ax.scatter(poll_x, polling_data[colmap["dem_pct"]], color="blue", alpha=0.2)
         ax.scatter(poll_x, polling_data[colmap["rep_pct"]], color="red", alpha=0.2)
 

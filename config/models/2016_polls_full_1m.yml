@@ -7,7 +7,7 @@ pymc:
   n_cores: 4
   n_tune_steps: 1000
   target_accept: 0.99
-  max_treedepth: 13
+  max_treedepth: 12
 model_kwargs:
   forecast_horizon: 10
   prior_precision: 5
@@ -18,5 +18,5 @@ model_kwargs:
   national_variance_prior_sigma: 0.1
   national_final_variance: 1.0e-6
 forecast_kwargs:
-  max_backcast: 60
+  max_backcast: 90
   time_window_days: 3

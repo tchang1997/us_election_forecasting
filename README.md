@@ -44,6 +44,8 @@ For initial testing, we use the Silver Bulletin dataset.The dataset contains 3,0
 
 Our model is largely based on Drew Linzer's Votamatic model, described in ["Dynamic Bayesian Forecasting of Presidential Elections in the States" (2013)](https://votamatic.org/wp-content/uploads/2013/07/Linzer-JASA13.pdf), with a few "because I can" style modifications. Essentially, this model places a multivariate Gaussian random walk prior on a "state-level" and "national-level" effect variable. Notably, we don't constrain the covariance to be diagonal, which naturally allows for modeling correlations between states (but runs some risks -- that's a lot of parameters). We then combine the state and national-level effects to output probabilistic forecasts of state and national voting averages at each timepoint.
 
+By default, we only consider polls up to two months back from the 
+
 ## Forecast validation
 
 All models are fitted on polling data sourced via 538 archives. Model selection for 2024 is done based on results for the 2020 and 2016 elections based on the average number of correct states, which forgives larger polling errors in safe states, followed by the electoral vote forecast error. Metrics for each model are averaged over all forecasts for a single model. For faster iteration, for initial model selection, we only sample 2000 samples (except for the polls-only approach, when I didn't know better). 
