@@ -8,7 +8,6 @@ This is a hobby project for electoral forecasting! Don't take it too seriously, 
 
 **Higher priority**
 * Add results for monthly forecasts up to 6 months out, back-casting 2 months, then weekly for final month
-* ~Fix national forecast -- separate it from the state effects matrix~
 * Pollster-specific effects (*e.g.*, house-effects, RV vs. LV)
 * Add "polls-plus" capability (*e.g.*, "fundamentals" like incumbency effects, economic indices, demographics via linkage to census data)
 
@@ -77,13 +76,12 @@ As a reference, the FiveThirtyEight forecast predicted a 52.9% - 45.9% margin on
 
 ### 2016 Election
 
-As a reference, the FiveThirtyEight forecast predicted a 52.9% - 45.9% margin one month out with a 329.2 - 208.7 EV victory. 
+As a reference, the FiveThirtyEight forecast predicted a 52.9% - 45.9% margin one month out with a 329.2 - 208.7 EV victory. Note that our forecasts for 2016 are a little more wonky, since we haven't accounted for the effect of Gary Johnson in polling numbers.
 
 |Model|(D) Win Prob. (PV)|D PV Forecast|D PV Actual|R PV Forecast|R PV Actual|(D) Win Prob. (EV)|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|EV Error|PV Error|
 |----|----|----|----|----|----|----|----|----|----|----|----|----|----|
 |Polls-only, one month out|72.5%|51.8%|48.0%|47.4%|45.8%|93.8%|322.7|232|215.3|306|**44**|**90.7**|**5.3%**|
 
-Coming soon!
 
 ### 2012 Election and older
 

@@ -75,7 +75,7 @@ def plot_forecast(
     ax.set_xticklabels(dates_list[::tick_every][::-1], rotation=45)
     ax.set_xlim((0, len(dem_mean) - 1))
 
-    if polling_data is not None:
+    if polling_data is not None and len(polling_data):
         # then we expect polls to be a dataframe with polldate, cand1_pct, cand2_pct
         
         # Convert poll_date to timestamp if it's not already

@@ -64,11 +64,13 @@ class PollOnlyModel(ElectionForecaster):
                 - INDICES: Dictionary of indices for the PyMC model.
         """
 
-        # other factors can be created by factorizing a column more directly, but we need to treat location specially. Time indices need to be pre-computed.
-        time_idx, time = filtered_df["windows_to_election"].factorize(sort=True)
+        # other factors can be created by factorizing a column more directly, but we need to treat time and location specially. Time indices need to be pre-computed.
+        # the time factors should correspond to a list of N-day windows 
+        _, time = pd.factorize(orig_df["windows_to_election"], sort=True)
+        time_idx = pd.Categorical(filtered_df["windows_to_election"], categories=time).codes
         
-        _, loc = orig_df[self.location_col].factorize(sort=True) 
-        loc_idx, _ = filtered_df[self.location_col].factorize(sort=True) # is there a faster way that doesn't require two checks?
+        _, loc = pd.factorize(orig_df[self.location_col], sort=True)
+        loc_idx = pd.Categorical(filtered_df[self.location_col], categories=loc).codes
         COORDS = {
             "location": loc,
             "time": time,
