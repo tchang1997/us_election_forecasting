@@ -10,8 +10,6 @@ def calculate_forecast_metrics(
     colmap: dict,
     pred_dem: np.ndarray,
     pred_rep: np.ndarray,
-    pred_dem_national: np.ndarray,
-    pred_rep_national: np.ndarray,
     actual_results: pd.DataFrame,
     locations: np.ndarray
 ) -> dict:
@@ -22,7 +20,7 @@ def calculate_forecast_metrics(
     pred_rep_se = pred_rep.std(axis=(0, 1)) / (pred_rep.shape[0] * pred_rep.shape[1])**0.5
     dem_win_prob = (pred_dem > pred_rep).mean(axis=(0, 1))
 
-    # Calculate mean and standard error for national prediction
+    """# Calculate mean and standard error for national prediction
     pred_dem_national_mean = pred_dem_national.mean(axis=(0, 1))
     pred_dem_national_se = pred_dem_national.std(axis=(0, 1)) / (pred_dem_national.shape[0] * pred_dem_national.shape[1])**0.5
     pred_rep_national_mean = pred_rep_national.mean(axis=(0, 1))
@@ -33,25 +31,25 @@ def calculate_forecast_metrics(
     full_rep_preds = pd.concat([pred_rep_mean.to_pandas(), pd.Series(pred_rep_national_mean.values, index=["US"])], axis=0)
     full_dem_se = pd.concat([pred_dem_se.to_pandas(), pd.Series(pred_dem_national_se.values, index=["US"])], axis=0)
     full_rep_se = pd.concat([pred_rep_se.to_pandas(), pd.Series(pred_rep_national_se.values, index=["US"])], axis=0)
-    full_dem_win_prob = pd.concat([dem_win_prob.to_pandas(), pd.Series(dem_national_win_prob.values, index=["US"])], axis=0)
+    full_dem_win_prob = pd.concat([dem_win_prob.to_pandas(), pd.Series(dem_national_win_prob.values, index=["US"])], axis=0)"""
     
     # Compute signed error for each location
-    dem_signed_error = actual_results[colmap["dem_actual"]] - full_dem_preds * 100
-    rep_signed_error = actual_results[colmap["rep_actual"]] - full_rep_preds * 100
+    dem_signed_error = actual_results[colmap["dem_actual"]] - pred_dem_mean * 100
+    rep_signed_error = actual_results[colmap["rep_actual"]] - pred_rep_mean * 100
 
     dem_winners = (actual_results[colmap["dem_actual"]] > actual_results[colmap["rep_actual"]])
-    forecast_dem_winners = pd.Series((full_dem_preds > full_rep_preds), index=dem_winners.index)
+    forecast_dem_winners = pd.Series((pred_dem_mean > pred_rep_mean), index=dem_winners.index)
 
     raw_forecast_data = {
         'location': locations,
-        'd_pred_mean': full_dem_preds * 100,
-        'd_pred_se': full_dem_se * 100,
-        'r_pred_mean': full_rep_preds * 100,
-        'r_pred_se': full_rep_se * 100,
-        'margin': (full_dem_preds - full_rep_preds) * 100,
-        'margin_se': np.sqrt(full_dem_se**2 + full_rep_se**2) * 100,
-        'd_win_prob': full_dem_win_prob * 100,
-        'r_win_prob': (1 - full_dem_win_prob) * 100,
+        'd_pred_mean': pred_dem_mean * 100,
+        'd_pred_se': pred_dem_se * 100,
+        'r_pred_mean': pred_rep_mean * 100,
+        'r_pred_se': pred_rep_se * 100,
+        'margin': (pred_dem_mean - pred_rep_mean) * 100,
+        'margin_se': np.sqrt(pred_dem_se**2 + pred_rep_se**2) * 100,
+        'd_win_prob': dem_win_prob * 100,
+        'r_win_prob': (1 - dem_win_prob) * 100,
         'd_actual': actual_results[colmap["dem_actual"]].values,
         'd_error': dem_signed_error.values,
         'r_actual': actual_results[colmap["rep_actual"]].values,
@@ -60,7 +58,6 @@ def calculate_forecast_metrics(
         'winner_actual': np.where(dem_winners, "D", "R"),
         'call_correct': (dem_winners == forecast_dem_winners),
     }
-
     return raw_forecast_data
 
 def prob_color(prob):
@@ -167,6 +164,7 @@ def calculate_ev_forecast(dem_no_us, rep_no_us, raw_forecast_df, actual_results)
     # Sort ELECTORAL_VOTES_2010 alphabetically to match the order of locations
     sorted_electoral_votes = dict(sorted(ELECTORAL_VOTES_2010.items()))
     ev_array = np.array(list(sorted_electoral_votes.values())) 
+
     dem_ev = (dem_no_us > rep_no_us).astype(int) * ev_array
     rep_ev = (rep_no_us >= dem_no_us).astype(int) * ev_array
     ec_simulations = pd.DataFrame(

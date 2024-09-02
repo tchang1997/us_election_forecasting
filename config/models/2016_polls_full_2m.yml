@@ -1,6 +1,6 @@
-name: "polls_only_2020_30d"
+name: "polls_only_2016_60d"
 model_name: "PollOnlyModel"
-year: 2020
+year: 2016
 pymc:
   n_samples: 500 # change to 500 for future model selection
   n_chains: 4
@@ -9,7 +9,7 @@ pymc:
   target_accept: 0.99
   max_treedepth: 12
 model_kwargs:
-  forecast_horizon: 10 # note that the forecast horizon in days is time_window_days * forecast_horizon!
+  forecast_horizon: 20
   prior_precision: 5
   prior_type: "half_t"
   state_variance_prior_bias: 1.0e-4

@@ -16,12 +16,11 @@ This is a hobby project for electoral forecasting! Don't take it too seriously, 
 * Add tipping point states to the report
 * Add ability to weight polls/pollsters differently by quality/time (note that this is distinct from a house-effect adjustment, which is tantamount to adjusting the polllster's "mean")
 * Different initial variances by state (*e.g.*, prior_precision as a vector) -- to model state elasticity
-* ~Different variance priors (*e.g.*, half-Cauchy?)~
 
 **Low priority**
 * Convention bounce adjustment
 * A dashboard for exploring different forecasts
-* Third-party adjustment (for switching to polls that have third parties)
+* Third-party adjustment (for switching to polls that have third parties) -- w/o controlling for Gary Johnson, some of the 2016 forecasts look visually wonky.
 
 ## How to run stuff
 
@@ -46,9 +45,22 @@ Our model is largely based on Drew Linzer's Votamatic model, described in ["Dyna
 
 By default, we only consider polls up to two months back from the forecast horizon (*e.g.*, we use August and September polls for a "start of October" forecast). 
 
+## Predictions
+
+We output three separate forecats from the same posterior: voting percentages, win probabilities, and an electoral vote forecast.
+
+**Voting percentages.** To output mean voting percentages, we take the mean of the estimated state-/national-level vote parameter for each party (a proportion from 0 to 1) over all election simulations.
+
+**Win probabilities.** We take the proportion of times that each party's vote parameter exceeds that of the other over all election simulations.
+
+**Electoral vote forecast.** For each sample, we compute the mean number of electoral votes won by each candidate per election simulation, and output the mean. Note that this forecast is not guaranteed to match the voting percentage forecast due to the all-or-nothing nature of the electoral college and correlated errors across states in our model.
+
+
 ## Forecast validation
 
-All models are fitted on polling data sourced via 538 archives. Model selection for 2024 is done based on results for the 2020 and 2016 elections based on the average number of correct states, which forgives larger polling errors in safe states, followed by the electoral vote forecast error. Metrics for each model are averaged over all forecasts for a single model. For faster iteration, for initial model selection, we only sample 2000 samples (except for the polls-only approach, when I didn't know better). 
+All models are fitted on polling data sourced via 538 archives. Model selection for 2024 is done based on results for the 2020 and 2016 elections based on the average number of correct states (incl. DC), which forgives larger polling errors in safe states, followed by the electoral vote forecast error, then popular vote error (absolute DEM + REP error). Metrics for each model are averaged over all forecasts for a single model. For faster iteration, for initial model selection, we only sample 2000 samples (4 chains, 500 each, 1000 tuning steps no matter what).
+
+Since the precision parameter (variance around the final estimate) should also decrease as we get closer to the election, after selecting a type of model (*e.g.,* polls-only vs. polls-plus), we validate schedules for that parameter within the chosen model class.
 
 Once model selection is finished, I'll release some 2024 forecasts.
 
@@ -56,17 +68,20 @@ Once model selection is finished, I'll release some 2024 forecasts.
 
 As a reference, the FiveThirtyEight forecast predicted a 52.9% - 45.9% margin one month out with a 333 - 205 EV victory. 
 
-|Model|(D) Win Prob.|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|
-|----|----|----|----|----|----|----|
-|Polls-only, one month out|>99.9%|306.3|306|231.7|232|47|
+|Model|(D) Win Prob. (PV)|D PV Forecast|D PV Actual|R PV Forecast|R PV Actual|(D) Win Prob. (EV)|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|EV Error|PV Error
+|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+|Polls-only, one month out|84.5%|49.6%|51.3%|45.9%|46.8%|83.3%|305.8|306|232.2|232|**47**|**0.2**|**2.5%**|
+|Polls-only, two months out|82.2%|49.8%|51.3%|45.5%|46.8%|72.4%|293.5|306|244.5|232|**49**|**12.5**|**2.9%**|
+|Polls-only, three months out|66.0%|50.1%|51.3%|46.9%|46.8%|66.8%|286.6|306|251.4|232|**49**|**19.4**|**1.2%%**|
+
 
 ### 2016 Election
 
 As a reference, the FiveThirtyEight forecast predicted a 52.9% - 45.9% margin one month out with a 329.2 - 208.7 EV victory. 
 
-|Model|(D) Win Prob.|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|
-|----|----|----|----|----|----|----|
-|Polls-only, one month out|92.5%|320.3|232|217.7|306|88.3|45|
+|Model|(D) Win Prob. (PV)|D PV Forecast|D PV Actual|R PV Forecast|R PV Actual|(D) Win Prob. (EV)|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|EV Error|PV Error|
+|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+|Polls-only, one month out|72.5%|51.8%|48.0%|47.4%|45.8%|93.8%|322.7|232|215.3|306|**44**|**90.7**|**5.3%**|
 
 Coming soon!
 
@@ -77,20 +92,3 @@ If anyone knows a source for polling data in 2012 and earlier (the Silver Bullet
 ## Contact 
 
 Email: `ctrenton` at `umich` dot `edu`.
-
-## Old Forecast results
-
-Initial debugging was done on a smaller dataset of polls collected from October onward.
-
-More to be added as runs finish!
-
-### 2016 Election 
-
-|Model|(D) Win Prob.|D EV Forecast|D EV Actual|R EV Forecast|R EV Actual|States Correct (incl. DC)|
-|----|----|----|----|----|----|----|
-|Polls-only, one week out|73.5%|290.9 (± 0.3)|232|247.1 (± 0.3)|306|46|
-
-**Disclaimer:** Note that I really didn't spend much time tuning this/doing so in any systematic manner.
-
-States that were incorrect in our simplest polls-only model were FL, IA, ME-2, MI, PA, and WI. In particular, we basically re-created the big misses in MI, PA, and WI in the 2016 election in many polls-based forecasts. In addition, one week before the election, the [538 forecast](https://projects.fivethirtyeight.com/2016-election-forecast/) projected a (D) win probability of 75.2%. Ours is 73.5%, which is subjectively pretty close.
-

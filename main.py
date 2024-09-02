@@ -21,19 +21,17 @@ def evaluate_forecast(
         df: pd.DataFrame,
         results_dir: str,
     ):
-    locations = sorted(np.append(trace.posterior.coords["location"].values, "US"))
+    locations = trace.posterior.coords["location"].values
     pred_dem = trace.posterior.dem_pi[:, :, 0, :] # dims: chain, sample_size, time (reversed), location 
     pred_rep = trace.posterior.rep_pi[:, :, 0, :]
-    pred_dem_national = trace.posterior.dem_pi_national[:, :, 0] 
-    pred_rep_national = trace.posterior.rep_pi_national[:, :, 0]
 
     actual_results = df.groupby(colmap["location"])[[colmap["dem_actual"], colmap["rep_actual"]]].first().sort_index()
-    raw_forecast_data = calculate_forecast_metrics(colmap, pred_dem, pred_rep, pred_dem_national, pred_rep_national, actual_results, locations)
+    raw_forecast_data = calculate_forecast_metrics(colmap, pred_dem, pred_rep, actual_results, locations)
 
     raw_forecast_df = pd.DataFrame(raw_forecast_data)
     raw_forecast_df.set_index('location', inplace=True) #
     print_forecast_table(raw_forecast_df)
-    ec_simulations = calculate_ev_forecast(pred_dem, pred_rep, raw_forecast_df, actual_results)
+    ec_simulations = calculate_ev_forecast(pred_dem[..., locations != "US"], pred_rep[..., locations != "US"], raw_forecast_df, actual_results)
 
     forecast_path = os.path.join(results_dir, f'forecast_summary.csv')
     raw_forecast_df.to_csv(forecast_path)

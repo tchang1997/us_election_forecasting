@@ -87,14 +87,9 @@ def preprocess_for_plotting(trace, polling_data, colmap, forecast_horizon, year,
     header = filtered_polling_data.iloc[0]
     election_result = polling_data.get_election_result(year=year, state=state)
 
-    if state == "US":
-        state_idx = None
-        dem_pi = trace["posterior"]["dem_pi_national"]
-        rep_pi = trace["posterior"]["rep_pi_national"]
-    else:
-        state_idx = np.where(trace["posterior"]["location"] == state)[0].item()
-        dem_pi = trace["posterior"]["dem_pi"]
-        rep_pi = trace["posterior"]["rep_pi"]
+    state_idx = np.where(trace["posterior"]["location"] == state)[0].item()
+    dem_pi = trace["posterior"]["dem_pi"]
+    rep_pi = trace["posterior"]["rep_pi"]
                                                
     # Convert to timestamps if not already
     if not pd.api.types.is_datetime64_any_dtype(filtered_polling_data[colmap["election_date"]]):

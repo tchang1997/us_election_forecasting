@@ -1,4 +1,4 @@
-name: "polls_only_2020_30d"
+name: "polls_only_2020_90d"
 model_name: "PollOnlyModel"
 year: 2020
 pymc:
@@ -9,7 +9,7 @@ pymc:
   target_accept: 0.99
   max_treedepth: 12
 model_kwargs:
-  forecast_horizon: 10 # note that the forecast horizon in days is time_window_days * forecast_horizon!
+  forecast_horizon: 30 # note that the forecast horizon in days is time_window_days * forecast_horizon!
   prior_precision: 5
   prior_type: "half_t"
   state_variance_prior_bias: 1.0e-4
