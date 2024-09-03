@@ -1,0 +1,22 @@
+name: "polls_only_2024_90d"
+model_name: "PollOnlyModel"
+year: 2024
+pymc:
+  n_samples: 500 # change to 500 for future model selection
+  n_chains: 4
+  n_cores: 4
+  n_tune_steps: 1000
+  target_accept: 0.99
+  max_treedepth: 12
+model_kwargs:
+  forecast_horizon: 30 # note that the forecast horizon in days is time_window_days * forecast_horizon!
+  prior_precision: 5
+  prior_type: "half_t"
+  state_variance_prior_bias: 1.0e-4
+  state_variance_prior_sigma: 0.5
+  national_variance_prior_bias: 1.0e-4
+  national_variance_prior_sigma: 0.2
+  national_final_variance: 1.0e-6
+forecast_kwargs:
+  max_backcast: 90
+  time_window_days: 3

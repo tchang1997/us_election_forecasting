@@ -4,9 +4,9 @@ import pandas as pd
 
 from typing import Union
 
-VALID_ELECTION_YEARS = [2000, 2004, 2008, 2012, 2016, 2020]
+VALID_ELECTION_YEARS = [2000, 2004, 2008, 2012, 2016, 2020, 2024]
 TWO_PARTY_CANDIDATES = {
-    "Bush", "Gore", "Kerry", "McCain", "Obama", "Romney", "Trump", "Clinton", "Biden"
+    "Bush", "Gore", "Kerry", "McCain", "Obama", "Romney", "Trump", "Clinton", "Biden", "Harris"
 }
 
 

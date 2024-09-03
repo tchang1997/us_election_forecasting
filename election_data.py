@@ -134,8 +134,13 @@ class PollsterDataset(object):
     def __init__(self, path="./data/Pollster_Stats_Full_2024.xlsx", sheet_name="pollster-stats-full-june-2024"):
         self.data = pd.read_excel(path, sheet_name=sheet_name)
 
-    def get_allowed_pollsters(self):
-        return self.data[self.data["Banned by 538"] == "no"]
+    def allowed_pollster_mask(self):
+        return self.data["Banned by 538"] == "no"
+    
+    def get_pollster_scores(self, non_forecast=False): # lower is better
+        if non_forecast:
+            return self.data["Advanced Plus-Minus"]
+        return self.data["Predictive    Plus-Minus"]
     
 class TwoPartyElectionResultDataset(object):
     def __init__(self, path="./data/1976-2020-president.csv", congressional_results="./data/Rawpolls_061224.xlsx"): # we'll peek at this for the CG results
@@ -176,7 +181,7 @@ class TwoPartyElectionResultDataset(object):
         df_with_national["REP_actual"] = df_with_national["candidatevotes_REPUBLICAN"] / df_with_national["totalvotes"] * 100
 
         # concatenate NE and ME district results
-        cg_df = pd.read_excel(congressional_results)
+        cg_df = pd.read_excel(congressional_results) # note that we'll only have CD results back to 2000
         cg_df = cg_df.loc[
             (cg_df["type_simple"] == "Pres-G") & 
             (cg_df["location"].str.contains(r'\d$')), 

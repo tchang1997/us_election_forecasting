@@ -44,12 +44,30 @@ def evaluate_forecast(
 def get_args():
     psr = argparse.ArgumentParser()
     psr.add_argument('--config', type=str, required=True, help='Path to the configuration file')
-    psr.add_argument('--dataset', type=str, default='small', choices=['small', 'full', 'full_2016'], help='Dataset to use.')
+    psr.add_argument('--dataset', type=str, default='small', choices=['small', 'full', 'full_2016', 'current'], help='Dataset to use.')
     psr.add_argument('--overwrite', action='store_true', help='Overwrite existing results directory')
     psr.add_argument('--regenerate_figures', action='store_true', help='Regenerate existing figures')
     return psr.parse_args()
 
-def load_dataset(dataset_name):
+def load_dataset(dataset_name: str) -> tuple[PollDataset, dict]:
+    """
+    Load a polling dataset and its corresponding column mapping based on the dataset name.
+
+    This function loads polling data from various sources and standardizes it into a common format
+    for use in election forecasting models. It also loads the appropriate column mapping for the dataset.
+
+    Args:
+        dataset_name (str): The name of the dataset to load. Valid options are 'small', 'full', 'full_2016', and 'current'.
+
+    Returns:
+        tuple[PollDataset, dict]: A tuple containing:
+            - An instance of a PollDataset subclass with the loaded polling data.
+            - A dictionary with the column mapping for the dataset.
+
+    Raises:
+        ValueError: If an invalid dataset name is provided.
+
+    """
     with open("./dataset_config.yml", 'r') as colmap_file:
         colmaps = yaml.load(colmap_file)
         colmap = colmaps["column_mappings"][dataset_name]
@@ -59,11 +77,45 @@ def load_dataset(dataset_name):
         polling_data = FlatPollDataset()
     elif dataset_name == "full_2016":
         polling_data = FiveThirtyEightPollDataset()
+    elif dataset_name == "current":
+        polling_data = FlatPollDataset(path="./data/president_polls.csv")
     else:
         raise ValueError(f"Invalid dataset: {dataset_name}")
     return polling_data, colmap
 
-def load_or_generate_trace(colmap, trace_filename, summary_path, overwrite, year, model_name, polling_data, forecast_kwargs, pymc_config, model_kwargs):
+def load_or_generate_trace(
+    colmap: dict,
+    trace_filename: str,
+    summary_path: str,
+    overwrite: bool,
+    year: int,
+    model_name: str,
+    polling_data: PollDataset,
+    forecast_kwargs: dict,
+    pymc_config: dict,
+    model_kwargs: dict
+) -> tuple[models.ElectionForecaster, az.InferenceData, pd.DataFrame]:
+    """
+    Load an existing trace or generate a new one if it doesn't exist or overwrite is True.
+
+    Args:
+        colmap (dict): Column mapping for the dataset.
+        trace_filename (str): Path to save or load the trace file.
+        summary_path (str): Path to save or load the summary file.
+        overwrite (bool): Whether to overwrite existing trace and summary files.
+        year (int): Election year.
+        model_name (str): Name of the model class to use.
+        polling_data (PollDataset): Dataset containing polling information.
+        forecast_kwargs (dict): Keyword arguments for the forecaster.
+        pymc_config (dict): Configuration for PyMC.
+        model_kwargs (dict): Additional keyword arguments for the model.
+
+    Returns:
+        tuple: A tuple containing:
+            - forecaster (ModelClass): An instance of the forecasting model.
+            - trace (az.InferenceData): The PyMC trace.
+            - summary (pd.DataFrame): Summary statistics of the trace.
+    """
     ModelClass = getattr(models, model_name)
     forecaster = ModelClass(year, colmap, **forecast_kwargs)
     if not os.path.exists(trace_filename) or overwrite:
@@ -114,7 +166,8 @@ if __name__ == '__main__':
 
     results_dir = os.path.join("./results", config["name"])
     year = config["year"]
-    trace_filename = os.path.join(results_dir, f"pymc_trace_{year}_horizon_{config['model_kwargs']['forecast_horizon']}d.nc")
+    forecast_horizon_days = config['model_kwargs']['forecast_horizon'] * config['forecast_kwargs']['time_window_days']
+    trace_filename = os.path.join(results_dir, f"pymc_trace_{year}_horizon_{forecast_horizon_days}d.nc")
     figure_dir = os.path.join(results_dir, "figures")
     figure_paths = [os.path.join(figure_dir, f"{state}_{year}_forecast.pdf") for state in VALID_LOCATIONS]
     summary_path = os.path.join(results_dir, "fit_summary.csv")

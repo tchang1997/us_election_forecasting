@@ -6,9 +6,9 @@ import pandas as pd
 import pymc as pm
 
 from aggregator import Aggregator, HistoricalAverage
-from election_data import PollDataset, TwoPartyElectionResultDataset, TWO_PARTY_COLMAP
+from election_data import PollDataset, PollsterDataset, TwoPartyElectionResultDataset, TWO_PARTY_COLMAP
 from plotting import plot_forecast
-from utils import convert_col_to_date
+from utils import convert_col_to_date, VALID_LOCATIONS
 
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -66,10 +66,11 @@ class PollOnlyModel(ElectionForecaster):
 
         # other factors can be created by factorizing a column more directly, but we need to treat time and location specially. Time indices need to be pre-computed.
         # the time factors should correspond to a list of N-day windows 
-        _, time = pd.factorize(orig_df["windows_to_election"], sort=True)
+        time = orig_df["windows_to_election"].dtype.categories
         time_idx = pd.Categorical(filtered_df["windows_to_election"], categories=time).codes
         
-        _, loc = pd.factorize(orig_df[self.location_col], sort=True)
+        #_, loc = pd.factorize(orig_df[self.location_col], sort=True)
+        loc = np.array(sorted(VALID_LOCATIONS)) # for cases where there are states with no polls. Shouldn't happen unless you're looking at some weird window.
         loc_idx = pd.Categorical(filtered_df[self.location_col], categories=loc).codes
         COORDS = {
             "location": loc,
@@ -83,7 +84,7 @@ class PollOnlyModel(ElectionForecaster):
     
     def create_variance_priors(
         self,
-        locations: pd.Series,
+        locations: np.ndarray,
         prior_type: str,
         state_variance_prior_sigma: float,
         state_variance_prior_bias: float,
@@ -91,7 +92,7 @@ class PollOnlyModel(ElectionForecaster):
         national_variance_prior_bias: float
     ) -> Tuple[pm.distributions.continuous.PositiveContinuous, pm.distributions.continuous.PositiveContinuous, pm.distributions.continuous.PositiveContinuous]:
         # state level effect. Prior = HalfNormal(0, 1) + slight bias away from 0.
-        state_variance_prior = np.ones_like(locations.values) * state_variance_prior_sigma
+        state_variance_prior = np.ones(*locations.shape) * state_variance_prior_sigma
         state_variance_prior[np.where(locations == "US")[0].item()] = 1e-6 # State effect should be essentially zero for the "US" index -- we model everything with a shared covariance to allow state-level errors to correlate w/ national errors
 
         if prior_type == "half_normal":
@@ -108,6 +109,21 @@ class PollOnlyModel(ElectionForecaster):
             rep_state_var = pm.HalfCauchy('rep_time_var', beta=state_variance_prior_sigma, dims="location") + state_variance_prior_bias
             sigma_delta = pm.HalfCauchy('national_effect', beta=national_variance_prior_sigma) + national_variance_prior_bias # shared. 
         return dem_state_var, rep_state_var, sigma_delta
+
+    def create_effect_vars(self, data_dict, priors):
+        dem_national_effects, rep_national_effects = self.create_national_effects(
+            priors['national']['var'],
+            priors['national']['final_var']
+        )
+        dem_state_effects, rep_state_effects = self.create_state_effects(
+            data_dict["pred_prior_mean"]["dem"],
+            data_dict["pred_prior_mean"]["rep"],
+            priors['state']['n_locations'],
+            priors['state']['prior_precision'],
+            priors['state']['dem_var'],
+            priors['state']['rep_var']
+        )
+        return [dem_national_effects, dem_state_effects], [rep_national_effects, rep_state_effects]
     
     def create_national_effects(self, sigma_delta: float, national_final_variance: float) -> Tuple[pm.GaussianRandomWalk, pm.GaussianRandomWalk]:
         dem_national_final = pm.Normal.dist(mu=0, sigma=national_final_variance)  # we want this to be constant, but sigma = 0 causes issues
@@ -193,14 +209,15 @@ class PollOnlyModel(ElectionForecaster):
         obs_n = included_polls[self.sample_size_col].astype(int)  # sample sizes, for validation
         emp_dem_n = (included_polls[self.dem_pct_col] * obs_n / 100).astype(int)
         emp_rep_n = (included_polls[self.rep_pct_col] * obs_n / 100).astype(int)
-        print("Total:", len(obs_n), "polls found")
+        start_date = included_polls[self.poll_date_col].min()
+        end_date = included_polls[self.poll_date_col].max()
+        print("Total:", len(obs_n), "polls found from", start_date, "to", end_date)
         return obs_n, emp_dem_n, emp_rep_n
     
     def preprocess_data(self, data: PollDataset, forecast_horizon: int):
         df = data.filter_polls(year=self.year)
         df_with_time = self.get_windows_to_election(df, forecast_horizon=forecast_horizon) # time-to-election index
         filtered_df = self.apply_poll_exclusions(df_with_time, forecast_horizon)
-
         coords, indices = self.get_coords_and_indices(df_with_time, filtered_df)
 
         # get observed poll values
@@ -239,13 +256,13 @@ class PollOnlyModel(ElectionForecaster):
             national_variance_prior_bias: Optional[float] = 1e-4,
             national_variance_prior_sigma: Optional[float] = 0.1,
             national_final_variance: Optional[float] = 1e-6,
-        ): # default: one week out. max_windows_back should be deprecated
+        ):
 
         print("Preprocessing data...")
         data_dict = self.preprocess_data(data, forecast_horizon)
         n_locations = len(data_dict["params"]["coords"]["location"]) 
         with pm.Model(coords=data_dict["params"]["coords"]) as model:
-            dem_state_var, rep_state_var, sigma_delta = self.create_variance_priors(
+            dem_state_var, rep_state_var, sigma_national = self.create_variance_priors(
                 data_dict["params"]["coords"]["location"],
                 prior_type,
                 state_variance_prior_sigma, 
@@ -254,22 +271,24 @@ class PollOnlyModel(ElectionForecaster):
                 national_variance_prior_bias
             )
 
-            # National-level effect (delta)            
-            dem_national_effects, rep_national_effects = self.create_national_effects(sigma_delta, national_final_variance)
-            dem_state_effects, rep_state_effects = self.create_state_effects(
-                data_dict["pred_prior_mean"]["dem"],
-                data_dict["pred_prior_mean"]["rep"],
-                n_locations,
-                prior_precision,
-                dem_state_var,
-                rep_state_var
-            )
-            # here, we can add additional effects in subclasses
-
+            # override this to incorporate fundamentals. TODO: how can programatically link this w/ create_variance_priors?
+            priors = {
+                'national': {
+                    'var': sigma_national,
+                    'final_var': national_final_variance
+                },
+                'state': {
+                    'n_locations': n_locations,
+                    'prior_precision': prior_precision,
+                    'dem_var': dem_state_var,
+                    'rep_var': rep_state_var
+                }
+            }
+            dem_params, rep_params = self.create_effect_vars(data_dict, priors)
             _, _, dem_polling_param, rep_polling_param = self.create_polling_parameters(
                 data_dict["params"]["indices"], 
-                dem_params=[dem_state_effects, dem_national_effects], # we'd pass a larger list of effects to subclasses (e.g., to account for house effects)
-                rep_params=[rep_state_effects, rep_national_effects],
+                dem_params=dem_params, # we'd pass a larger list of effects to subclasses (e.g., to account for house effects)
+                rep_params=rep_params,
             )
             self.create_likelihood(
                 data_dict["observed"]["n"],
@@ -291,7 +310,32 @@ class PollOnlyModel(ElectionForecaster):
         return model, trace, summary_df
         
 class PollsAdjustedModel(ElectionForecaster): 
-    pass # house effects, but no fundamentals
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pollster_data = PollsterDataset()
+
+    def get_coords_and_indices(self, orig_df, filtered_df):
+        init_coords, init_indices = super().get_coords_and_indices(orig_df, filtered_df)
+        # add pollster effects and variance prior
+        final_coords, final_indices = {}, {}
+        return final_coords, final_indices
+
+    def apply_poll_exclusions(
+        self,
+        df: pd.DataFrame,
+        forecast_horizon: int,
+    ) -> Tuple[pd.DataFrame, pd.Series, pd.Series, pd.Series]:
+        df_time_subset = df.dropna(subset="windows_to_election")
+        null_sample_size = pd.isnull(df_time_subset[self.sample_size_col])
+        import pdb; pdb.set_trace() 
+        # TODO: filter out banned pollsters here
+
+        poll_inclusion_criteria = (df_time_subset["windows_to_election"] >= forecast_horizon) & ~null_sample_size
+        return df_time_subset.loc[poll_inclusion_criteria] 
+    
+
+
+
 
 class PollsPlusAdjustedModel(ElectionForecaster):
     pass # fundamentals + house effects

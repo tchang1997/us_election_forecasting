@@ -13,25 +13,37 @@ def calculate_forecast_metrics(
     actual_results: pd.DataFrame,
     locations: np.ndarray
 ) -> dict:
+    """
+    Calculate comprehensive forecast metrics for election predictions.
+
+    This function computes various metrics including:
+    - Mean and standard error of Democratic and Republican vote share predictions
+    - Predicted margins and their standard errors
+    - Win probabilities for both parties
+    - Actual election results
+    - Prediction errors
+    - Predicted and actual winners
+    - Accuracy of winner predictions
+
+    Args:
+        colmap (dict): A dictionary mapping column names to their standardized names.
+        pred_dem (np.ndarray): Predicted Democratic vote shares, shape (chains, draws, locations).
+        pred_rep (np.ndarray): Predicted Republican vote shares, shape (chains, draws, locations).
+        actual_results (pd.DataFrame): Actual election results.
+        locations (np.ndarray): Array of location names.
+
+    Returns:
+        dict: A dictionary containing the computed forecast metrics for each location.
+              Keys include 'location', 'd_pred_mean', 'd_pred_se', 'r_pred_mean', 'r_pred_se',
+              'margin', 'margin_se', 'd_win_prob', 'r_win_prob', 'd_actual', 'd_error',
+              'r_actual', 'r_error', 'winner_pred', 'winner_actual', and 'call_correct'.
+    """
     # Calculate mean and standard error for each location
     pred_dem_mean = pred_dem.mean(axis=(0, 1))
     pred_dem_se = pred_dem.std(axis=(0, 1)) / (pred_dem.shape[0] * pred_dem.shape[1])**0.5
     pred_rep_mean = pred_rep.mean(axis=(0, 1))
     pred_rep_se = pred_rep.std(axis=(0, 1)) / (pred_rep.shape[0] * pred_rep.shape[1])**0.5
     dem_win_prob = (pred_dem > pred_rep).mean(axis=(0, 1))
-
-    """# Calculate mean and standard error for national prediction
-    pred_dem_national_mean = pred_dem_national.mean(axis=(0, 1))
-    pred_dem_national_se = pred_dem_national.std(axis=(0, 1)) / (pred_dem_national.shape[0] * pred_dem_national.shape[1])**0.5
-    pred_rep_national_mean = pred_rep_national.mean(axis=(0, 1))
-    pred_rep_national_se = pred_rep_national.std(axis=(0, 1)) / (pred_rep_national.shape[0] * pred_rep_national.shape[1])**0.5
-    dem_national_win_prob = (pred_dem_national > pred_rep_national).mean(axis=(0, 1))
-
-    full_dem_preds = pd.concat([pred_dem_mean.to_pandas(), pd.Series(pred_dem_national_mean.values, index=["US"])], axis=0)
-    full_rep_preds = pd.concat([pred_rep_mean.to_pandas(), pd.Series(pred_rep_national_mean.values, index=["US"])], axis=0)
-    full_dem_se = pd.concat([pred_dem_se.to_pandas(), pd.Series(pred_dem_national_se.values, index=["US"])], axis=0)
-    full_rep_se = pd.concat([pred_rep_se.to_pandas(), pd.Series(pred_rep_national_se.values, index=["US"])], axis=0)
-    full_dem_win_prob = pd.concat([dem_win_prob.to_pandas(), pd.Series(dem_national_win_prob.values, index=["US"])], axis=0)"""
     
     # Compute signed error for each location
     dem_signed_error = actual_results[colmap["dem_actual"]] - pred_dem_mean * 100
